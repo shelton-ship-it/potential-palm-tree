@@ -1,0 +1,13 @@
+{
+  "id": "io.qzz.pixgo.webos",
+  "version": "1.0.0",
+  "vendor": "Pixgo",
+  "type": "web",
+  "main": "index.html",
+  "title": "Pixgo",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "resolution": "1920x1080",
+  "iconColor": "#0a0a0c",
+  "requiredPermissions": ["network.internet"]
+}
