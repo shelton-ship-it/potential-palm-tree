@@ -1,0 +1,45 @@
+{
+  "name": "pixgo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "i18next": "^23.11.5",
+    "react-i18next": "^14.1.2",
+    "i18next-browser-languagedetector": "^8.0.0",
+    "zustand": "^4.5.4",
+    "react-hot-toast": "^2.4.1",
+    "qrcode.react": "^3.1.0",
+    "clsx": "^2.1.1",
+    "@fingerprintjs/fingerprintjs": "^5.2.0",
+    "@mui/icons-material": "^5.16.7",
+    "@mui/material": "^5.16.7",
+    "hls.js": "^1.5.15",
+    "shaka-player": "^5.0.7",
+    "@noble/ciphers": "^2.4.0",
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@khmyznikov/pwa-install": "^0.6.4",
+    "disable-devtool": "^0.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/hls.js": "^0.13.3",
+    "typescript": "^5.5.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5",
+    "tailwindcss": "^3.4.4",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39"
+  }
+}
