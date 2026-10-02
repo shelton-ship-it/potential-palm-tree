@@ -110,23 +110,27 @@ fun PixGoNavHost(nav: NavHostController, authState: AuthState, app: PixGoApp) {
 }
 
 /**
- * Tela de entrada NATIVA que reproduz o fluxo REAL ativo do frontend_web:
- *  - app/auth/login|register/page.tsx não têm formulário — redirecionam ao
- *    hub (HubLoginSheet, WebView dedicada só à autenticação, como a
- *    exceção já existente do checkout/FastWebViewSheet);
- *  - app/auth/tv/page.tsx tem código numérico -> POST /api/auth/device/activate
- *    (AuthRepository.loginWithDeviceCode, endpoint já confirmado em
- *    api-core routes/device.js). Nada inventado.
+ * Tela de entrada — réplica do fluxo REAL ativo do frontend_web.
+ *  - app/auth/login/page.tsx e register/page.tsx NÃO têm formulário nem UI
+ *    própria ("pixgo.qzz.io não tem mais UI própria de autenticação"): fazem
+ *    window.location.replace para o hub (HUB_LOGIN_URL?return_to=). O
+ *    equivalente exacto no Android é abrir a HubLoginSheet (WebView dedicada
+ *    só à autenticação, como a exceção já existente do checkout) logo ao
+ *    entrar — sem botões "Entrar/Criar conta" inventados;
+ *  - app/auth/tv/page.tsx É uma página real com teclado numérico de 6 dígitos
+ *    -> POST /api/auth/device/activate (AuthRepository.loginWithDeviceCode,
+ *    endpoint confirmado em api-core routes/device.js). Oferecemos esse acesso
+ *    como alternativa discreta, tal como o link "entrar com senha" do original
+ *    convive com o código. Nada inventado.
  */
 @Composable
 fun LoginScreen() {
     val context = LocalContext.current
     val app = context.applicationContext as PixGoApp
     val t = LocalTranslator.current
-    val authState by app.authRepository.state.collectAsStateWithLifecycle()
-    var hubMode by remember { mutableStateOf<String?>(null) }   // "login" | "register"
-    var tvMode by remember { mutableStateOf(false) }
-    var code by remember { mutableStateOf("") }
+    var hubMode by rememberSaveable { mutableStateOf<String?>(null) }   // "login" | "register"
+    var tvMode by rememberSaveable { mutableStateOf(false) }
+    var code by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -139,6 +143,22 @@ fun LoginScreen() {
         return
     }
 
+    if (!tvMode) {
+        // Espelha loginRedirectUrl() de lib/auth-redirect.ts:
+        //   if (path === '/auth/login' && isLikelyTV()) path = '/auth/tv';
+        //   senão window.location.replace imediato para o hub.
+        // /auth/tv É página real do frontend (teclado de 6 dígitos + link
+        // "Entrar com utilizador e senha"); smartphone nunca a vê — vai
+        // directo ao hub, como o redirect original.
+        LaunchedEffect(Unit) {
+            val uiCfg = context.resources.configuration
+            val isTvDevice = uiCfg.keyboard != android.content.res.Configuration.KEYBOARD_NONE ||
+                uiCfg.navigation == android.content.res.Configuration.NAVIGATION_DPAD ||
+                context.packageManager.hasSystemFeature("android.software.leanback")
+            if (isTvDevice) tvMode = true else hubMode = "login"
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().background(Px.BgDark).windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -149,40 +169,27 @@ fun LoginScreen() {
             contentDescription = "PixGo",
             modifier = Modifier.height(56.dp)
         )
-        Spacer(Modifier.height(32.dp))
 
-        Button(
-            enabled = !authState.loading,
-            onClick = { hubMode = "login" },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Px.Primary),
-            shape = MaterialTheme.shapes.small
-        ) { Text(t.t("auth.signIn")) }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            enabled = !authState.loading,
-            onClick = { hubMode = "register" },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = MaterialTheme.shapes.small
-        ) { Text(t.t("auth.signUp")) }
-
-        Spacer(Modifier.height(24.dp))
-        TextButton(onClick = { tvMode = !tvMode; error = null }) {
-            Text(if (tvMode) t.t("common.cancel") else t.t("auth.tvCodeTitle"))
-        }
-        if (tvMode) {
-            Spacer(Modifier.height(8.dp))
+        if (!tvMode) {
+            Spacer(Modifier.height(32.dp))
+            CircularProgressIndicator(modifier = Modifier.size(28.dp), color = Px.Primary)
+            Spacer(Modifier.height(24.dp))
+            TextButton(onClick = { tvMode = true }) {
+                Text(t.t("auth.tvCodeTitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            Spacer(Modifier.height(32.dp))
             Text(
                 t.t("auth.tvCodeSteps"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = code,
                 onValueChange = { nv -> code = nv.filter { it.isDigit() }.take(6) },
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 label = { Text(t.t("auth.tvCodeTitle")) }
             )
             error?.let {
@@ -191,7 +198,7 @@ fun LoginScreen() {
             }
             Spacer(Modifier.height(12.dp))
             Button(
-                enabled = !authState.loading && code.length == 6,
+                enabled = code.length == 6,
                 onClick = {
                     error = null
                     scope.launch {
@@ -207,14 +214,16 @@ fun LoginScreen() {
                             }
                         } catch (e: Exception) {
                             code = ""
-                            error = "Falha de rede."
+                            error = t.t("auth.tvActivateError")
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Px.Primary)
-            ) {
-                if (authState.loading) CircularProgressIndicator(modifier = Modifier.size(18.dp)) else Text(t.t("auth.signIn"))
+            ) { Text(t.t("auth.signIn")) }
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { hubMode = "login"; tvMode = false; error = null }) {
+                Text(t.t("auth.tvUsePassword"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -235,11 +244,23 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
     var current by navSaved
     var searchQuery by remember { mutableStateOf("") }
     val langCode by app.languageManager.languageCode.collectAsStateWithLifecycle(initialValue = "pt")
-    var plansWebView by remember { mutableStateOf(false) }
+    // Estado da rota /main/plans (tela nativa PlansScreen): "highlight" é o
+    // ?highlight= do RateLimitModal/ChannelsRateLimit do web; pendingCheckout
+    // guarda a URL de checkout que PlansScreen pediu para abrir (handleSubscribe
+    // → HUB_CHECKOUT_URL?plan=&return_to=), consumida pelo FastWebViewSheet.
+    var plansHighlight by remember { mutableStateOf<String?>(null) }
+    fun openPlans(highlight: String? = null) {
+        plansHighlight = highlight
+        current = MainDest.PLANS
+    }
+    // URL do checkout do hub aberta a partir da tela Plans ("Assinar" →
+    // HUB_CHECKOUT_URL?plan=&return_to=, exactamente como handleSubscribe em
+    // plans/page.tsx). null = nenhuma sheet de checkout aberta.
+    var checkoutUrl by remember { mutableStateOf<String?>(null) }
     // O aviso jurídico dos planos nunca é memorizado no web (PlansNoticeModal);
     // rearme a cada nova abertura do fluxo de checkout.
     var plansNoticeShown by remember { mutableStateOf(false) }
-    LaunchedEffect(plansWebView) { if (plansWebView) plansNoticeShown = false }
+    LaunchedEffect(checkoutUrl) { if (checkoutUrl != null) plansNoticeShown = false }
     var watchContentId by watchSaved
     // Abertura de download concluído pela tela Downloads → Watch em modo
     // offline (PlayerScreen usa PlayerRepository.startLocal; sem rede).
@@ -299,7 +320,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             // (equivalente de lib/downloads.ts + IndexedDB do web).
             downloadCount = downloadsCount,
             onOpenDownloads = { current = MainDest.DOWNLOADS },
-            onUpgrade = { plansWebView = true },
+            onUpgrade = { openPlans() },
             onSignOut = { scope.launch { app.authRepository.logout() } },
             suggest = { q -> app.catalogRepository.search(q, contentLangFor(langCode), limit = 6) },
             onOpenContent = { id -> watchContentId = id },
@@ -340,7 +361,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                     authRepository = app.authRepository,
                     contactRepository = app.contactRepository,
                     onForcedLogout = { current = MainDest.HOME },
-                    onOpenPlans = { plansWebView = true }
+                    onOpenPlans = { openPlans() }
                 )
                 MainDest.LEGAL -> io.pixgo.app.ui.legal.LegalScreen(legalRepository = app.legalRepository, uiLang = langCode)
                 // /main/upload real (page.tsx, 406 linhas) — formulário nativo com
@@ -353,8 +374,16 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                 MainDest.DOWNLOADS -> io.pixgo.app.ui.downloads.DownloadsScreen(
                     authState = authState,
                     onOpenDownload = { cid, ep -> watchOffline = cid to ep },
-                    onUpgrade = { plansWebView = true },
+                    onUpgrade = { openPlans() },
                     onBrowseCatalog = { current = MainDest.CATALOG }
+                )
+                // /main/plans real (page.tsx) — tela nativa; "Assinar" abre o
+                // checkout do hub (?plan=&return_to=) na WebView única.
+                MainDest.PLANS -> io.pixgo.app.ui.plans.PlansScreen(
+                    authRepository = app.authRepository,
+                    plan = authState.plan,
+                    highlight = plansHighlight,
+                    onSubscribe = { url -> checkoutUrl = url }
                 )
             }
         }
@@ -377,7 +406,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                 uiLang = langCode,
                 onClose = { watchContentId = null },
                 onOpenRecommendation = { cid -> watchContentId = cid },
-                onUpgrade = { plansWebView = true }
+                onUpgrade = { openPlans() }
             )
         }
 
@@ -392,7 +421,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                 uiLang = langCode,
                 onClose = { watchOffline = null },
                 onOpenRecommendation = { nid -> watchContentId = nid; watchOffline = null },
-                onUpgrade = { plansWebView = true },
+                onUpgrade = { openPlans() },
                 offline = true
             )
         }
@@ -402,7 +431,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
         // (mesmo HUB_CHECKOUT_URL?plan=&return_to= de plans/page.tsx), então o
         // aviso aparece SEMPRE antes de abrir esse fluxo — nunca memorizado,
         // exatamente como no original.
-        if (plansWebView && !plansNoticeShown) {
+        if (checkoutUrl != null && !plansNoticeShown) {
             io.pixgo.app.ui.modals.PlansNoticeDialog(
                 onDismiss = { plansNoticeShown = true }
             )
@@ -423,17 +452,23 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             }
         }
 
-        if (plansWebView) {
-            io.pixgo.app.ui.webview.FastWebViewSheet(
-                url = "https://app.pixgo.qzz.io/main/plans",
-                onClose = {
-                    plansWebView = false
-                    // Réplica do fluxo ?px_paid= (CheckoutStatusPage/ZumboPay): ao
-                    // fechar, invalida o cache de /me para reflectir um plano novo
-                    // sem esperar pelo TTL de 30min.
-                    scope.launch { app.authRepository.invalidateMeCacheAfterPayment() }
-                }
-            )
+        // Checkout REAL do hub (handleSubscribe de plans/page.tsx →
+        // HUB_CHECKOUT_URL?plan=&return_to=) na WebView única. A URL vem
+        // SEMPRE da tela Plans nativa via onSubscribe; o fallback antigo
+        // (abrir /main/plans direto, ignorando a tela nativa) foi eliminado.
+        checkoutUrl?.let { url ->
+            if (plansNoticeShown) {
+                io.pixgo.app.ui.webview.FastWebViewSheet(
+                    url = url,
+                    onClose = {
+                        checkoutUrl = null
+                        // Réplica do fluxo ?px_paid= (CheckoutStatusPage/ZumboPay): ao
+                        // fechar, invalida o cache de /me para reflectir um plano novo
+                        // sem esperar pelo TTL de 30min.
+                        scope.launch { app.authRepository.invalidateMeCacheAfterPayment() }
+                    }
+                )
+            }
         }
     }
 

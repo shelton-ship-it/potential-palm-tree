@@ -77,8 +77,10 @@ fun MyListScreen(
                     if (content != null) {
                         Column {
                             ContentCardCell(
-                                posterUrl = content.poster,
                                 title = content.title ?: "—",
+                                posterUrl = content.poster,
+                                year = content.year,
+                                type = content.type,
                                 onClick = { onOpenContent(content.id) }
                             )
                             TextButton(onClick = { remove(entry) }) { Text("Remover") }
