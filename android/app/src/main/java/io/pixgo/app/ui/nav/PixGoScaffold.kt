@@ -136,7 +136,7 @@ import kotlin.math.roundToInt
  * NAV do AppShell.tsx: home, catalog, channels(liveTV), mylist, search —
  * nessa ordem. ACCOUNT/LEGAL são as rotas /main/account e /main/legal.
  */
-enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, ACCOUNT, LEGAL }
+enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, ACCOUNT, LEGAL }
 
 private val PxEase = CubicBezierEasing(0.25f, 0.46f, 0.45f, 0.94f)  // --transition-medium
 private val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)       // CSS `ease`

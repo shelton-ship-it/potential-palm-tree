@@ -95,7 +95,10 @@ fun WatchScreen(
     uiLang: String,
     onClose: () -> Unit,
     onOpenRecommendation: (String) -> Unit,
-    onUpgrade: () -> Unit
+    onUpgrade: () -> Unit,
+    // Sessão offline (abertura de download concluído pela tela Downloads):
+    // default false = fluxo remoto idêntico ao anterior.
+    offline: Boolean = false
 ) {
     val t = LocalTranslator.current
     val context = LocalContext.current
@@ -124,6 +127,22 @@ fun WatchScreen(
     // Throttle do heartbeat de progresso (lastProgressSave/lastProgressPct do original).
     var lastSaveAt by remember(contentId) { mutableLongStateOf(0L) }
     var lastPct by remember(contentId) { mutableIntStateOf(-1) }
+
+    // Estado do download deste conteúdo — motor + store nativos (réplica
+    // de startDownload() em lib/downloads.ts; ver DownloadEngine.kt).
+    val downloadStore = remember { io.pixgo.app.data.download.DownloadStore(context) }
+    val downloadEngine = remember { io.pixgo.app.data.download.DownloadEngine(context) }
+    val downloadKey = io.pixgo.app.data.download.DownloadStore.keyFor(contentId, episodeId)
+    var dlMeta by remember(downloadKey) {
+        mutableStateOf<io.pixgo.app.data.download.DownloadMeta?>(null)
+    }
+    LaunchedEffect(downloadKey, offline) {
+        if (offline) return@LaunchedEffect
+        while (true) {
+            dlMeta = downloadStore.allOnce().find { it.key == downloadKey }
+            delay(700L)
+        }
+    }
 
     LaunchedEffect(contentId) {
         loading = true
@@ -170,6 +189,7 @@ fun WatchScreen(
                     episodeId = activeEp?.id ?: episodeId,
                     onClose = onClose,
                     onTimeUpdate = null,
+                    offline = offline,
                     fullscreen = true,
                     onToggleFullscreen = { fullscreen = false },
                     onRateLimited = { message, plans -> rateLimit = message to plans },
@@ -216,9 +236,11 @@ fun WatchScreen(
                             contentId = contentId,
                             episodeId = activeEp?.id ?: episodeId,
                         onClose = onClose,
+                        offline = offline,
                         onTimeUpdate = { curSec, durSec ->
                             // handleTime exato: user + profileId + dur válidos; 60s; skip pct repetido.
                             run {
+                                if (offline) return@run // progresso remoto não se aplica a sessões locais
                                 val pid = authState.activeProfileId ?: return@run
                                 if (authState.user == null || durSec <= 0 || curSec < 0) return@run
                                 val now = System.currentTimeMillis()
@@ -313,14 +335,41 @@ fun WatchScreen(
                                 }
                             }
                         )
-                        // Sem equivalente Android do IndexedDB ainda (Etapa Downloads):
-                        // gate idêntico ao original — plano pago ativo → permitir; senão upsell.
+                        // Baixar — gate idêntico ao original (plano pago ativo);
+                        // motor real de download por segmentos (DownloadEngine,
+                        // réplica de startDownload() em lib/downloads.ts).
+                        val dlStatus = dlMeta?.status
                         ActionChip(
-                            label = if (canDownload) "Baixar" else "Premium",
-                            icon = if (canDownload) Icons.Filled.Download else Icons.Filled.Lock,
+                            label = when {
+                                !canDownload -> "Premium"
+                                offline || dlStatus == io.pixgo.app.data.download.DownloadStatus.COMPLETED -> "Baixado"
+                                dlStatus == io.pixgo.app.data.download.DownloadStatus.DOWNLOADING -> "Baixando ${dlMeta?.progress ?: 0}%"
+                                else -> "Baixar"
+                            },
+                            icon = if (!canDownload) Icons.Filled.Lock else Icons.Filled.Download,
                             onClick = {
-                                if (!canDownload) onUpgrade()
-                                else toast = "Downloads: ainda por construir."
+                                if (!canDownload) { onUpgrade(); return@ActionChip }
+                                if (offline || dlStatus == io.pixgo.app.data.download.DownloadStatus.COMPLETED) {
+                                    toast = "Já está disponível offline."
+                                    return@ActionChip
+                                }
+                                scope.launch {
+                                    when (val r = downloadEngine.start(
+                                        contentId, activeEp?.id ?: episodeId,
+                                        d.displayTitle, d.displayPoster ?: ""
+                                    )) {
+                                        is io.pixgo.app.data.download.DownloadStart.Started ->
+                                            toast = "Download concluído."
+                                        is io.pixgo.app.data.download.DownloadStart.AlreadyDone ->
+                                            toast = "Já está disponível offline."
+                                        is io.pixgo.app.data.download.DownloadStart.GateBlocked -> {
+                                            // 403 real do backend: mensagem do servidor.
+                                            if (r.exhausted) onUpgrade() else toast = r.message
+                                        }
+                                        is io.pixgo.app.data.download.DownloadStart.Failed ->
+                                            toast = r.message
+                                    }
+                                }
                             }
                         )
                         ActionChip(
@@ -606,11 +655,63 @@ private fun RateLimitDialog(
 
 @Composable
 private fun SessionReplacedDialog(message: String, onClose: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onClose,
-        containerColor = Px.CardBg,
-        title = { Text("🔒 Sessão encerrada", color = Px.TextTitle, fontWeight = FontWeight.Black) },
-        text = { Text(message, color = Px.TextMuted, fontSize = 13.sp, lineHeight = 20.sp) },
-        confirmButton = { TextButton(onClick = onClose) { Text("Entendi", color = Px.PrimaryGlow) } }
+    DialogShell(
+        title = "🔒 Sessão encerrada",
+        message = message,
+        primaryLabel = "Entendi",
+        onPrimary = onClose,
     )
+}
+
+/**
+ * Diálogo modal no padrão visual dos modais do frontend (UploadTermsModal/
+ * UploadRulesModal/SessionReplacedModal): overlay rgba(0,0,0,.82), card
+ * #121216 borda #1F1F26 raio 14, título Montserrat 800, corpo muted 13sp,
+ * rodapé com botões. Reutilizado pela tela de Upload (uploadDialogs).
+ */
+@Composable
+fun DialogShell(
+    title: String,
+    message: String,
+    primaryLabel: String,
+    onPrimary: () -> Unit,
+    secondaryLabel: String? = null,
+    onSecondary: (() -> Unit)? = null,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xD1000000)) // rgba(0,0,0,0.82)
+            .clickable(enabled = false) {},
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Px.CardBg)
+                .border(1.dp, Px.Border, RoundedCornerShape(14.dp))
+                .padding(20.dp)
+        ) {
+            Text(title, color = Px.TextTitle, fontWeight = FontWeight.Black, fontSize = 17.sp)
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                Text(message, color = Px.TextMuted, fontSize = 13.sp, lineHeight = 20.sp)
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (secondaryLabel != null && onSecondary != null) {
+                    TextButton(
+                        onClick = onSecondary,
+                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(Color(0xFF1A1A20)),
+                    ) { Text(secondaryLabel, color = Px.TextMuted, fontSize = 13.sp) }
+                }
+                TextButton(
+                    onClick = onPrimary,
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(Px.Primary.copy(alpha = 0.15f)),
+                ) { Text(primaryLabel, color = Px.PrimaryGlow, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
 }

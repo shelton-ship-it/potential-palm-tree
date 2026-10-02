@@ -1,13 +1,18 @@
 package io.pixgo.app.data.player
 
 import android.content.Context
+import android.util.Base64
 import io.pixgo.app.data.auth.TokenManager
+import io.pixgo.app.data.download.DownloadEngine
+import io.pixgo.app.data.download.DownloadStore
+import io.pixgo.app.data.download.DownloadStatus
 import io.pixgo.app.data.model.StreamLimitErrorBody
 import io.pixgo.app.data.model.UpsellPlan
 import io.pixgo.app.data.network.HeartbeatBody
 import io.pixgo.app.data.network.NetworkModule
 import io.pixgo.app.data.network.StreamResponse
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 sealed class StreamHandshakeResult {
@@ -34,9 +39,10 @@ sealed class HeartbeatEvent {
  * indisponíveis), por isso ficam de fora aqui em vez de fabricar um
  * fingerprint que não existe no Android.
  */
-class PlayerRepository(context: Context) {
+class PlayerRepository(private val context: Context) {
     private val tokenManager = TokenManager(context)
     private val api by lazy { NetworkModule.stream(context, tokenManager) }
+    private val store by lazy { DownloadStore(context) }
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {
@@ -89,6 +95,49 @@ class PlayerRepository(context: Context) {
             HeartbeatEvent.Ok // falha de rede pontual — não interrompe a reprodução, igual ao catch{} silencioso do original
         }
     }
+
+    /**
+     * Playlist HLS sintética para reprodução offline — réplica literal de
+     * buildOfflinePlaylist() em ShakaPlayer.tsx (linhas 383-400), com o
+     * esquema "idb://" trocado por "pixgo-offline://" (mesma ideia: URL
+     * local resolvida pelo loader, não pela rede). Duração estimada por
+     * segmento porque o pipeline não grava durações reais — o player corrige
+     * a duração real ao decodificar os fMP4, exactamente como no web.
+     */
+    fun startLocal(contentId: String, episodeId: String?): Boolean {
+        val key = DownloadStore.keyFor(contentId, episodeId)
+        val meta = runBlocking { store.get(key) } ?: return false
+        if (meta.status != DownloadStatus.COMPLETED || meta.keyHex.isNullOrBlank()) return false
+
+        val total = meta.segCount
+        if (total <= 0) return false
+        val sb = StringBuilder()
+        sb.append("#EXTM3U\n")
+        sb.append("#EXT-X-VERSION:7\n")
+        sb.append("#EXT-X-TARGETDURATION:${DownloadEngine.OFFLINE_SEG_DURATION.toInt()}\n")
+        sb.append("#EXT-X-PLAYLIST-TYPE:VOD\n")
+        sb.append("#EXT-X-MAP:URI=\"${OfflineLocal.SCHEME}://$key/init.bin\"\n")
+        repeat(total) {
+            sb.append("#EXTINF:%.3f,\n".format(DownloadEngine.OFFLINE_SEG_DURATION))
+            sb.append("${OfflineLocal.SCHEME}://$key/seg.bin?i=$it\n")
+        }
+        sb.append("#EXT-X-ENDLIST\n")
+
+        offlineMasterUrl = "data:application/x-mpegURL;base64," +
+            Base64.encodeToString(sb.toString().toByteArray(), Base64.NO_WRAP)
+        offlineKeyHex = meta.keyHex
+        return true
+    }
+
+    /** true quando startLocal() foi chamado — o chamador deve saltar handshake/heartbeat. */
+    val isOfflineSession: Boolean get() = offlineMasterUrl != null
+    val offlineStreamUrl: String? get() = offlineMasterUrl
+
+    /** Chave da sessão offline (drm_key_hex do download concluído); nula em sessões online. */
+    fun offlineKey(): ByteArray? = offlineKeyHex?.let { BinFormat.keyFromHex(it) }
+
+    private var offlineMasterUrl: String? = null
+    private var offlineKeyHex: String? = null
 
     private fun parseErrorBody(raw: String?): StreamLimitErrorBody? {
         if (raw.isNullOrBlank()) return null

@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import io.pixgo.app.ui.auth.HubLoginSheet
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -53,11 +54,23 @@ class MainActivity : ComponentActivity() {
             PixGoTheme {
                 val ctx = LocalContext.current
                 val langCode by app.languageManager.languageCode.collectAsStateWithLifecycle(initialValue = "pt")
+                // Gate real de Providers.tsx: LanguageModal aparece uma única vez,
+                // antes de qualquer conteúdo, enquanto 'pixgo_lang' nunca foi escolhido.
+                val langChosen by app.languageManager.langChosen.collectAsStateWithLifecycle(initialValue = true)
                 val translator = remember(langCode) { Translator.create(ctx, langCode) }
                 CompositionLocalProvider(LocalTranslator provides translator) {
                     val nav = rememberNavController()
                     val authState by app.authRepository.state.collectAsStateWithLifecycle()
-                    PixGoNavHost(nav, authState, app)
+                    if (!langChosen) {
+                        io.pixgo.app.ui.modals.LanguageChoiceDialog(
+                            initialSelected = langCode,
+                            onContinue = { code ->
+                                app.ioScope.launch { app.languageManager.setLanguage(code) }
+                            },
+                        )
+                    } else {
+                        PixGoNavHost(nav, authState, app)
+                    }
                 }
             }
         }
@@ -210,14 +223,48 @@ fun LoginScreen() {
 @OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun HomeShell(authState: AuthState, app: PixGoApp) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var current by remember { mutableStateOf(MainDest.HOME) }
     var searchQuery by remember { mutableStateOf("") }
     val langCode by app.languageManager.languageCode.collectAsStateWithLifecycle(initialValue = "pt")
     var uploadDialog by remember { mutableStateOf(false) }
     var plansWebView by remember { mutableStateOf(false) }
+    // O aviso jurídico dos planos nunca é memorizado no web (PlansNoticeModal);
+    // rearme a cada nova abertura do fluxo de checkout.
+    var plansNoticeShown by remember { mutableStateOf(false) }
+    LaunchedEffect(plansWebView) { if (plansWebView) plansNoticeShown = false }
     var watchContentId by remember { mutableStateOf<String?>(null) }
+    // Abertura de download concluído pela tela Downloads → Watch em modo
+    // offline (PlayerScreen usa PlayerRepository.startLocal; sem rede).
+    var watchOffline by remember { mutableStateOf<Pair<String, String?>?>(null) }
+    // Contagem real do badge — DownloadStore reconcilia DataStore + disco.
+    val downloadsStore = remember { io.pixgo.app.data.download.DownloadStore(context) }
+    var downloadsCount by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            downloadsCount = runCatching { downloadsStore.allOnce().size }.getOrDefault(0)
+            delay(3_000L)
+        }
+    }
     var watchingChannel by remember { mutableStateOf<io.pixgo.app.data.channels.ChannelListItem?>(null) }
+    // DisclaimerGate real (Providers.tsx): com sessão ativa, o DisclaimerModal
+    // aparece até aceitar; "Recusar" memoriza pixgo_disclaimer_dismissed.
+    var showDisclaimer by remember { mutableStateOf(false) }
+    LaunchedEffect(authState.hydrated, authState.token) {
+        if (authState.hydrated && authState.token != null &&
+            !app.authRepository.isDisclaimerDismissed()
+        ) showDisclaimer = true
+    }
+    if (showDisclaimer) {
+        io.pixgo.app.ui.modals.DisclaimerDialog(
+            onAccept = { showDisclaimer = false },
+            onDismiss = {
+                showDisclaimer = false
+                app.ioScope.launch { app.authRepository.setDisclaimerDismissed(true) }
+            },
+        )
+    }
     val activeProfile = authState.profiles.find { it.id == authState.activeProfileId }
     var snackbarText by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -242,9 +289,10 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                     app.authRepository.setLanguageServerSide(code)
                 }
             },
-            // Downloads offline (lib/downloads.ts, IndexedDB) ainda sem equivalente nativo.
-            downloadCount = 0,
-            onOpenDownloads = { snackbarText = "Downloads: ainda por construir." },
+            // Downloads offline nativos — DownloadEngine/DownloadStore
+            // (equivalente de lib/downloads.ts + IndexedDB do web).
+            downloadCount = downloadsCount,
+            onOpenDownloads = { current = MainDest.DOWNLOADS },
             onUpload = { uploadDialog = true },
             onUpgrade = { plansWebView = true },
             onSignOut = { scope.launch { app.authRepository.logout() } },
@@ -290,6 +338,12 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                     onOpenPlans = { plansWebView = true }
                 )
                 MainDest.LEGAL -> io.pixgo.app.ui.legal.LegalScreen(legalRepository = app.legalRepository, uiLang = langCode)
+                MainDest.DOWNLOADS -> io.pixgo.app.ui.downloads.DownloadsScreen(
+                    authState = authState,
+                    onOpenDownload = { cid, ep -> watchOffline = cid to ep },
+                    onUpgrade = { plansWebView = true },
+                    onBrowseCatalog = { current = MainDest.CATALOG }
+                )
             }
         }
 
@@ -312,6 +366,33 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                 onClose = { watchContentId = null },
                 onOpenRecommendation = { cid -> watchContentId = cid },
                 onUpgrade = { plansWebView = true }
+            )
+        }
+
+        // Download concluído aberto pela tela Downloads → Watch offline
+        // (PlayerScreen detecta a sessão local via startLocal; sem rede).
+        watchOffline?.let { (cid, ep) ->
+            io.pixgo.app.ui.watch.WatchScreen(
+                contentId = cid,
+                episodeId = ep,
+                authState = authState,
+                catalogRepository = app.catalogRepository,
+                uiLang = langCode,
+                onClose = { watchOffline = null },
+                onOpenRecommendation = { nid -> watchContentId = nid; watchOffline = null },
+                onUpgrade = { plansWebView = true },
+                offline = true
+            )
+        }
+
+        // PlansNoticeModal real: no web ele vive em /plans (sempre ao entrar) e
+        // na aba "subscription" da conta. No Android o checkout é o hub externo
+        // (mesmo HUB_CHECKOUT_URL?plan=&return_to= de plans/page.tsx), então o
+        // aviso aparece SEMPRE antes de abrir esse fluxo — nunca memorizado,
+        // exatamente como no original.
+        if (plansWebView && !plansNoticeShown) {
+            io.pixgo.app.ui.modals.PlansNoticeDialog(
+                onDismiss = { plansNoticeShown = true }
             )
         }
 
