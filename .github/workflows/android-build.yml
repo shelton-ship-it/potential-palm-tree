@@ -15,6 +15,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     # Todos os comandos Gradle executam dentro de android/ (raiz do
     # projeto Android — não mover o projeto).
@@ -33,22 +34,22 @@ jobs:
           java-version: '17'
 
       # AGP 8.5.2 + compileSdk 34: exige platform-34 e build-tools.
-      # setup-android garante-os e aceita as licenças em vez de depender
-      # apenas do que a imagem do runner traz pré-instalado.
+      # CORREÇÃO: o default do input `packages` do setup-android@v3 inclui
+      # o pacote legado `tools`, que já não existe no repositório do SDK e
+      # faz o sdkmanager sair com exit code 1 ("Failed to find package
+      # 'tools'"). Aqui `packages` é definido explicitamente, sem `tools`.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 12266719
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
       # NOTA: este repositório ainda NÃO tem o Gradle Wrapper comitado
       # (android/gradlew, android/gradle/wrapper/gradle-wrapper.jar e
-      # gradle-wrapper.properties não existem; o .gradle/8.7 local é só
-      # cache de uma execução anterior, gerada por um Gradle fora do repo).
-      # Para cumprir "usar o wrapper existente sem instalar versão
-      # arbitrária", este passo GERA o wrapper na versão 8.7 exatamente
-      # quando android/gradlew não existe no checkout, usando a própria
-      # task oficial `wrapper` do Gradle (não é uma versão inventada — é a
-      # versão com que o projeto já foi compilado localmente). Quando o
-      # wrapper for comitado no repositório, este passo passa a no-op e o
-      # build usa ./gradlew diretamente.
+      # gradle-wrapper.properties não existem). Este passo GERA o wrapper
+      # na versão 8.7 quando android/gradlew não existe no checkout, usando
+      # a task oficial `wrapper` do Gradle. Quando o wrapper for comitado
+      # no repositório, este passo passa a no-op.
       - name: Ensure Gradle Wrapper exists (v8.7)
         run: |
           if [ ! -f ./gradlew ]; then
