@@ -1,1 +1,19 @@
-(empty)
+# Build outputs
+build/
+**/build/
+
+# Gradle caches
+.gradle/
+**/.gradle/
+
+# Local config (machine-specific)
+local.properties
+
+# TS incremental build info
+*.tsbuildinfo
+
+# Node modules
+node_modules/
+
+# Kotlin compiler caches
+.kotlin/

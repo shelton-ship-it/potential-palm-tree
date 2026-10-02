@@ -131,6 +131,10 @@ object NetworkModule {
     fun pixelServiceAuth(context: Context, tokenManager: TokenManager): PixelServiceAuthApi =
         retrofit(Hosts.PIXEL_SERVICE, okHttp(context, tokenManager)).create(PixelServiceAuthApi::class.java)
 
+    /** paymentsApi real do frontend (GET /api/payments/plans — routes/payments.js). */
+    fun payments(context: Context, tokenManager: TokenManager): PaymentsApi =
+        retrofit(Hosts.PIXEL_SERVICE, okHttp(context, tokenManager)).create(PaymentsApi::class.java)
+
     fun catalog(context: Context, tokenManager: TokenManager): CatalogApi =
         retrofit(Hosts.PIXEL_SERVICE, okHttp(context, tokenManager)).create(CatalogApi::class.java)
 

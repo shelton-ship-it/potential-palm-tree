@@ -34,6 +34,26 @@ data class Plan(
     val gateway: String? = null
 )
 
+/**
+ * Item de GET /api/payments/plans (pixel_service_v1 routes/payments.js —
+ * fonte: PLANS em lib/edgeone.js + override de país em plan-pricing-read).
+ * Campos e nomes espelham exatamente o type Plan em
+ * frontend_web/src/app/main/plans/page.tsx. Nada inventado.
+ */
+@Serializable
+data class PaymentPlan(
+    val id: String,
+    val name: String,
+    val price: Double? = null,
+    val label: String? = null,
+    @SerialName("billing_cycle") val billingCycle: String? = null,
+    @SerialName("max_profiles") val maxProfiles: Int? = null,
+    @SerialName("max_downloads") val maxDownloads: Int? = null,
+    val features: List<String> = emptyList(),
+    val currency: String? = null,
+    val gateway: String? = null
+)
+
 @Serializable
 data class Profile(
     val id: String,
