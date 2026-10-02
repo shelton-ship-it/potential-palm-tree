@@ -1,0 +1,90 @@
+name: Android Build
+
+# Workflow na RAIZ do repositório (.github/workflows/), como exigido pelo
+# GitHub Actions. O projeto Android vive em android/ (settings.gradle.kts
+# com rootProject "PixGo" e módulo :app), por isso todos os caminhos de
+# build/cache/artifact partem da raiz e entram em android/.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Todos os comandos Gradle executam dentro de android/ (raiz do
+    # projeto Android — não mover o projeto).
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # AGP 8.5.2 + compileSdk 34: exige platform-34 e build-tools.
+      # setup-android garante-os e aceita as licenças em vez de depender
+      # apenas do que a imagem do runner traz pré-instalado.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # NOTA: este repositório ainda NÃO tem o Gradle Wrapper comitado
+      # (android/gradlew, android/gradle/wrapper/gradle-wrapper.jar e
+      # gradle-wrapper.properties não existem; o .gradle/8.7 local é só
+      # cache de uma execução anterior, gerada por um Gradle fora do repo).
+      # Para cumprir "usar o wrapper existente sem instalar versão
+      # arbitrária", este passo GERA o wrapper na versão 8.7 exatamente
+      # quando android/gradlew não existe no checkout, usando a própria
+      # task oficial `wrapper` do Gradle (não é uma versão inventada — é a
+      # versão com que o projeto já foi compilado localmente). Quando o
+      # wrapper for comitado no repositório, este passo passa a no-op e o
+      # build usa ./gradlew diretamente.
+      - name: Ensure Gradle Wrapper exists (v8.7)
+        run: |
+          if [ ! -f ./gradlew ]; then
+            echo "gradlew ausente no checkout - gerando wrapper 8.7 via task oficial 'wrapper'"
+            tmp=$(mktemp -d)
+            curl -fsSL -o "$tmp/gradle.zip" \
+              https://services.gradle.org/distributions/gradle-8.7-bin.zip
+            unzip -q "$tmp/gradle.zip" -d "$tmp"
+            "$tmp/gradle-8.7/bin/gradle" -p "$PWD" wrapper --gradle-version 8.7
+            rm -rf "$tmp"
+          fi
+          chmod +x ./gradlew
+          ./gradlew --version
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle.properties', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Compile Kotlin (debug)
+        run: ./gradlew :app:compileDebugKotlin --no-daemon
+
+      - name: Compile Java (debug)
+        run: ./gradlew :app:compileDebugJavaWithJavac --no-daemon
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixgo-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
