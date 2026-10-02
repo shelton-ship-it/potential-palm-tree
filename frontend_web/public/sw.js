@@ -40,7 +40,11 @@
 // FIX pagamentos: bump obrigatório — versões anteriores serviam /main/plans/*
 // (checkout, success, pending, analysis) em cacheFirst, ficando presas numa
 // cópia antiga. Agora essas rotas nunca passam pelo SW (ver NEVER_CACHE_PAGES).
-const CACHE_VERSION = 'pixgo-v10';
+//
+// FIX denúncias de direitos autorais: bump obrigatório, as páginas /copyright,
+// /copyright/response e /copyright/portal mostram o estado atual das denúncias e
+// nunca passam pelo SW (ver NEVER_CACHE_PAGES).
+const CACHE_VERSION = 'pixgo-v11';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const AUTH_CACHE    = `${CACHE_VERSION}-auth`;
 
@@ -64,9 +68,10 @@ const NEVER_CACHE = [
   '/api/auth/refresh',
 ];
 
-// Páginas do fluxo de pagamento — NUNCA cacheadas nem interceptadas pelo SW
-// (rede sempre, sem fallback de cache), para o plano/estado mostrado ser o real.
-const NEVER_CACHE_PAGES = ['/main/plans'];
+// Páginas do fluxo de pagamento e do fluxo de denúncias: NUNCA cacheadas nem
+// interceptadas pelo SW (rede sempre, sem fallback de cache), para o plano ou
+// estado mostrado ser o real.
+const NEVER_CACHE_PAGES = ['/main/plans', '/copyright'];
 
 const AUTH_CACHE_PATHS = ['/api/auth/me'];
 
