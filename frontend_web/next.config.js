@@ -29,6 +29,16 @@ const nextConfig = {
         headers: NO_STORE_HEADERS,
       },
       {
+        // Denúncia de direitos autorais (formulário, resposta e Portal de
+        // Proteção): reflete o estado atual das notificações, NUNCA cacheado.
+        source: '/copyright/:path*',
+        headers: NO_STORE_HEADERS,
+      },
+      {
+        source: '/copyright',
+        headers: NO_STORE_HEADERS,
+      },
+      {
         source: '/sw.js',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
