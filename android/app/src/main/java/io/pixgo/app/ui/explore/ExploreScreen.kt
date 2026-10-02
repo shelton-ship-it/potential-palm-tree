@@ -121,7 +121,14 @@ fun ExploreScreen(
             modifier = Modifier.weight(1f)
         ) {
             items(items, key = { it.id }) { item ->
-                ContentCardCell(item.displayPoster, item.displayTitle, onClick = { onOpenContent(item.id) })
+                ContentCardCell(
+                    title = item.displayTitle,
+                    posterUrl = item.displayPoster,
+                    year = item.year,
+                    type = item.type,
+                    rating = item.displayRating,
+                    onClick = { onOpenContent(item.id) }
+                )
             }
         }
 

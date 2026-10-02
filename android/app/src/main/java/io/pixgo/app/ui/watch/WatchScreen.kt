@@ -96,6 +96,10 @@ fun WatchScreen(
     onClose: () -> Unit,
     onOpenRecommendation: (String) -> Unit,
     onUpgrade: () -> Unit,
+    // RateLimitModal real do web: onUpgrade(planId) →
+    // router.push(`/main/plans?highlight=${planId}`). Distingue-se de
+    // onUpgrade() simples (botões "Fazer upgrade" sem plano sugerido).
+    onUpgradeWithHighlight: (planId: String) -> Unit = { onUpgrade() },
     // Sessão offline (abertura de download concluído pela tela Downloads):
     // default false = fluxo remoto idêntico ao anterior.
     offline: Boolean = false
@@ -456,7 +460,7 @@ fun WatchScreen(
                 message = message,
                 plans = plans,
                 onClose = { rateLimit = null; onClose() },
-                onUpgrade = { rateLimit = null; onUpgrade() }
+                onUpgrade = { planId -> rateLimit = null; onUpgradeWithHighlight(planId) }
             )
         }
 
@@ -608,7 +612,7 @@ private fun RateLimitDialog(
     message: String?,
     plans: List<UpsellPlan>,
     onClose: () -> Unit,
-    onUpgrade: () -> Unit
+    onUpgrade: (planId: String) -> Unit
 ) {
     val t = LocalTranslator.current
     AlertDialog(
@@ -648,7 +652,13 @@ private fun RateLimitDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onUpgrade) { Text("Assinar", color = Px.PrimaryGlow) } },
+        // Web real: onUpgrade={(planId) => { setShowRateLimit(false);
+        // router.push(`/main/plans?highlight=${planId}`); }}
+        confirmButton = {
+            TextButton(onClick = { onUpgrade(featured?.id ?: plans.firstOrNull()?.id ?: "") }) {
+                Text("Assinar", color = Px.PrimaryGlow)
+            }
+        },
         dismissButton = { TextButton(onClick = onClose) { Text(t.t("common.close")) } }
     )
 }

@@ -30,6 +30,9 @@ data class ContentItem(
     val displayTitle: String get() = meta?.title ?: title ?: "—"
     val displayPoster: String? get() = meta?.poster ?: poster
     val displayRating: Double? get() = meta?.rating ?: rating
+    /** year/type usados pelos cards — item.year / item.type em main/page.tsx. */
+    val displayYear: Int? get() = year
+    val displayType: String? get() = type
 }
 
 @Serializable

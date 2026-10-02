@@ -136,7 +136,7 @@ import kotlin.math.roundToInt
  * NAV do AppShell.tsx: home, catalog, channels(liveTV), mylist, search —
  * nessa ordem. ACCOUNT/LEGAL são as rotas /main/account e /main/legal.
  */
-enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, UPLOAD, ACCOUNT, LEGAL }
+enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, UPLOAD, PLANS, ACCOUNT, LEGAL }
 
 private val PxEase = CubicBezierEasing(0.25f, 0.46f, 0.45f, 0.94f)  // --transition-medium
 private val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)       // CSS `ease`
@@ -313,15 +313,19 @@ fun PixGoScaffold(
                         NavItem(
                             "Downloads", Icons.Filled.Download, false, color = Color(0x59FFFFFF),
                             badge = { Badge("PRO", Color(0x14FFFFFF), Color(0x59FFFFFF), 9.6.sp) }
-                        ) { onUpgrade(); closeSidebarOnMobile() }
+                        // /main/plans (AppShell: Link href="/main/plans" quando free)
+                        ) { onNavigate(MainDest.PLANS); closeSidebarOnMobile() }
                     }
                     NavItem(t.t("nav.upload"), Icons.Filled.CloudUpload, current == MainDest.UPLOAD, color = Color(0x8CFFFFFF)) { onNavigate(MainDest.UPLOAD); closeSidebarOnMobile() }
+                    // AppShell real: <Link href="/main/plans"> — "Fazer upgrade"
+                    // navega para a tela de planos nativa (nunca abre o
+                    // checkout directamente).
                     NavItem(
-                        t.t("nav.upgrade"), Icons.Filled.Bolt, false,
+                        t.t("nav.upgrade"), Icons.Filled.Bolt, current == MainDest.PLANS,
                         badge = if (!isPremium) {
                             { Badge("Free", Color(0x2EE50914), Px.Primary, 9.28.sp) }
                         } else null
-                    ) { onUpgrade(); closeSidebarOnMobile() }
+                    ) { onNavigate(MainDest.PLANS); closeSidebarOnMobile() }
                     NavItem(t.t("nav.account"), Icons.Filled.Settings, current == MainDest.ACCOUNT) { onNavigate(MainDest.ACCOUNT); closeSidebarOnMobile() }
                     NavItem(t.t("legal.title"), Icons.Filled.Gavel, current == MainDest.LEGAL) { onNavigate(MainDest.LEGAL); closeSidebarOnMobile() }
                 }
@@ -506,7 +510,7 @@ fun PixGoScaffold(
                         MenuSep()
                     }
                     MenuItem(onClick = { onNavigate(MainDest.ACCOUNT); userMenuOpen = false }) { Text(t.t("nav.account"), color = Px.TextMuted, fontSize = 14.sp) }
-                    MenuItem(onClick = { onUpgrade(); userMenuOpen = false }) { Text(t.t("nav.upgrade"), color = Px.TextMuted, fontSize = 14.sp) }
+                    MenuItem(onClick = { onNavigate(MainDest.PLANS); userMenuOpen = false }) { Text(t.t("nav.upgrade"), color = Px.TextMuted, fontSize = 14.sp) }
                     MenuItem(onClick = { onNavigate(MainDest.MY_LIST); userMenuOpen = false }) { Text(t.t("nav.myList"), color = Px.TextMuted, fontSize = 14.sp) }
                     if (canDownload) MenuItem(onClick = { onOpenDownloads(); userMenuOpen = false }) { Text("Downloads", color = Px.TextMuted, fontSize = 14.sp) }
                     MenuSep()
