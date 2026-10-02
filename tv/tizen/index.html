@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Pixgo</title>
+  <style>html,body{margin:0;background:#0a0a0c;height:100%}</style>
+</head>
+<body>
+  <script>
+    // Wrapper fino: a app real é a mesma SPA de sempre, só carregada aqui
+    // dentro (regra 10/13 do plano — não duplicar a aplicação). O
+    // User-Agent do WebView do Tizen já contém "Tizen", que isLikelyTV() e
+    // useDeviceType() (src/lib/tv-navigation.ts / src/hooks/useDeviceType.ts)
+    // já reconhecem directamente — sem precisar de nenhum parâmetro extra.
+    window.location.replace('https://www.pixgo.qzz.io/main');
+  </script>
+</body>
+</html>

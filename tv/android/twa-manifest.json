@@ -1,0 +1,47 @@
+{
+  "packageId": "io.qzz.pixgo.twa",
+  "host": "www.pixgo.qzz.io",
+  "name": "Pixgo",
+  "launcherName": "Pixgo",
+  "display": "standalone",
+  "themeColor": "#e50914",
+  "navigationColor": "#0a0a0c",
+  "navigationColorDark": "#0a0a0c",
+  "navigationDividerColor": "#0a0a0c",
+  "backgroundColor": "#0a0a0c",
+  "enableNotifications": false,
+  "startUrl": "/main",
+  "iconUrl": "https://www.pixgo.qzz.io/icons/icon-512.png",
+  "maskableIconUrl": "https://www.pixgo.qzz.io/icons/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "signingKeyStorePassword": "pixgotv2026",
+  "signingKeyPassword": "pixgotv2026",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    { "name": "Início", "shortName": "Início", "url": "/main", "chosenIconUrl": "https://www.pixgo.qzz.io/icons/icon-96.png" },
+    { "name": "TV ao Vivo", "shortName": "TV", "url": "/main/channels", "chosenIconUrl": "https://www.pixgo.qzz.io/icons/icon-96.png" }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://www.pixgo.qzz.io/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://www.pixgo.qzz.io/",
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [
+    { "webManifestUrl": "https://app.pixgo.qzz.io/manifest.json" }
+  ],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "shareTarget": null
+}

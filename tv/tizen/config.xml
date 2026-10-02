@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="https://www.pixgo.qzz.io/tizen"
+        version="1.0.0"
+        viewmodes="fullscreen">
+  <tizen:application id="pixgoTV.PixgoTV" package="pixgoTV" required_version="6.0"/>
+  <name>Pixgo</name>
+  <icon src="icon.png"/>
+  <content src="index.html"/>
+  <!-- Redireciona para o site já publicado — não duplica a app, só a
+       empacota (regra 10 do plano). -->
+  <access origin="https://www.pixgo.qzz.io" subdomains="true"/>
+  <access origin="https://app.pixgo.qzz.io" subdomains="true"/>
+  <access origin="https://api.pixgo.qzz.io" subdomains="true"/>
+  <access origin="https://pixel.pixgo.qzz.io" subdomains="true"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/network.get"/>
+  <tizen:setting screen-orientation="landscape"
+                 context-menu="disable"
+                 background-support="disable"
+                 encryption="disable"
+                 install-location="auto"
+                 hwkey-event="enable"/>
+  <tizen:profile name="tv"/>
+  <tizen:metadata key="http://samsung.com/tv/metadata/use.dialog" value="true"/>
+</widget>
