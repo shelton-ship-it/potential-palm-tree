@@ -37,6 +37,20 @@ object NetworkModule {
     @Volatile private var cookieJar: PersistentCookieJar? = null
     @Volatile private var okHttpClient: OkHttpClient? = null
 
+    /**
+     * Importa cookies gravados pelo android.webkit.CookieManager (ex.: o
+     * pixgo_session + token definidos pelo hub durante o login na
+     * HubLoginSheet) para o jar OkHttp partilhado — caminho inverso do
+     * WebViewCookieSync, usando a mesma persistência já existente.
+     */
+    fun importCookiesFromWebView(context: Context, url: String) {
+        val jar = cookieJar ?: PersistentCookieJar(context.applicationContext).also { cookieJar = it }
+        val raw = android.webkit.CookieManager.getInstance().getCookie(url) ?: return
+        raw.split(";").map { it.trim() }.filter { it.contains("=") }.forEach { pair ->
+            jar.importCookie(context, url, pair)
+        }
+    }
+
     private fun authInterceptor(tokenManager: TokenManager): Interceptor = Interceptor { chain ->
         val token = runBlocking { tokenManager.getToken() }
         val request = if (token != null) {

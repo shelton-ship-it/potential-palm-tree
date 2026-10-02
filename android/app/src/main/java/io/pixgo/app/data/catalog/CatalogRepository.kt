@@ -4,9 +4,11 @@ import android.content.Context
 import io.pixgo.app.data.auth.AuthRepository
 import io.pixgo.app.data.auth.TokenManager
 import io.pixgo.app.data.model.ContentItem
+import io.pixgo.app.data.model.ContentDetail
 import io.pixgo.app.data.model.ContinueItem
 import io.pixgo.app.data.model.MyListEntry
 import io.pixgo.app.data.network.MyListMutationBody
+import io.pixgo.app.data.model.ProgressUpdateBody
 import io.pixgo.app.data.network.NetworkModule
 import retrofit2.Response
 
@@ -79,6 +81,25 @@ class CatalogRepository(private val context: Context, private val auth: AuthRepo
         return CatalogPage(body.items, body.pagination?.pages ?: 1)
     }
 
+    /**
+     * Recomendados da Watch — replica exatamente a chamada de
+     * watch/[id]/page.tsx: catalogApi.list({ type, limit: 12, sort:
+     * 'recommended', exclude: id }). Backend exige `exclude` quando
+     * sort=recommended (routes/catalog.js).
+     */
+    suspend fun recommended(type: String, excludeId: String, lang: String): List<ContentItem> {
+        val params = mapOf(
+            "type" to type,
+            "limit" to "12",
+            "sort" to "recommended",
+            "exclude" to excludeId,
+            "lang" to lang
+        )
+        val resp = retryOn401 { api.list(params) }
+        if (!resp.isSuccessful) return emptyList()
+        return (resp.body()?.items ?: emptyList()).take(12)
+    }
+
     /** Espelha app/main/search/page.tsx — sem sugestões/popular (removidas do original). */
     suspend fun search(query: String, lang: String, limit: Int = 24): List<ContentItem> {
         val resp = retryOn401 { api.search(mapOf("q" to query, "limit" to limit.toString(), "lang" to lang)) }
@@ -98,4 +119,44 @@ class CatalogRepository(private val context: Context, private val auth: AuthRepo
 
     suspend fun removeFromMyList(profileId: String, contentId: String): Boolean =
         retryOn401 { api.removeFromMyList(MyListMutationBody(profileId, contentId)) }.isSuccessful
+
+    /**
+     * Espelha contentApi.get de lib/api.ts:
+     * GET /api/content/:id?lang=(profile_id opcional). O backend embute
+     * `in_list` quando profile_id vem junto (routes/content.js) — o ecrã
+     * usa-o antes de cair no check separado, tal como watch/[id]/page.tsx.
+     */
+    suspend fun content(id: String, lang: String, activeProfileId: String?): ContentDetail? {
+        val params = mutableMapOf("lang" to lang)
+        activeProfileId?.let { params["profile_id"] = it }
+        val resp = retryOn401 { api.content(id, params) }
+        if (!resp.isSuccessful) return null
+        return resp.body()
+    }
+
+    /** myListApi.check(contentId, profileId) — fallback quando in_list não vem embutido. */
+    suspend fun checkMyList(contentId: String, activeProfileId: String?): Boolean {
+        val params = activeProfileId?.let { mapOf("profileId" to it) } ?: emptyMap()
+        val resp = retryOn401 { api.checkMyList(contentId, params) }
+        return resp.body()?.inList ?: false
+    }
+
+    /**
+     * progressApi.update do heartbeat de progresso de watch/[id]/page.tsx
+     * (POST /api/progress/update, body camelCase; falha silenciosa como o
+     * .catch(() => {}) original).
+     */
+    suspend fun updateProgress(
+        profileId: String,
+        contentId: String,
+        episodeId: String?,
+        progress: Int,
+        durationSeconds: Int
+    ) {
+        try {
+            retryOn401 {
+                api.updateProgress(ProgressUpdateBody(profileId, contentId, episodeId, "en", progress, durationSeconds))
+            }
+        } catch (_: Exception) { /* silencioso — igual ao original */ }
+    }
 }

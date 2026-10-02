@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.DataSourceException
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import okhttp3.OkHttpClient
@@ -52,13 +51,12 @@ class BinDecryptDataSource(
                 resp.body?.bytes() ?: ByteArray(0)
             }
         } catch (e: IOException) {
-            throw DataSourceException(e, DataSourceException.TYPE_OPEN)
+            throw e
         }
 
         val payload = if (url.endsWith(".bin")) {
-            val key = keyProvider() ?: throw DataSourceException(
-                "Chave de decifra indisponível para $url",
-                DataSourceException.TYPE_OPEN
+            val key = keyProvider() ?: throw IOException(
+                "Chave de decifra indisponível para $url"
             )
             BinFormat.decrypt(raw, key)
         } else {

@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -112,9 +113,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.ImageLoader
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
-import coil.decode.SvgDecoder
+
+import io.pixgo.app.R
 import io.pixgo.app.data.i18n.LocalTranslator
 import io.pixgo.app.data.i18n.SUPPORTED_LANGUAGES
 import io.pixgo.app.data.model.ContentItem
@@ -130,7 +132,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Destinos que, no frontend_web, vivem DENTRO do AppShell (app/main/*).
+ * Destinos que, no frontend_web, vivem DENTRO do AppShell (rotas app/main).
  * NAV do AppShell.tsx: home, catalog, channels(liveTV), mylist, search —
  * nessa ordem. ACCOUNT/LEGAL são as rotas /main/account e /main/legal.
  */
@@ -354,13 +356,12 @@ fun PixGoScaffold(
                 Spacer(Modifier.width(22.dp))
 
                 // .logo img height:18px, marginRight:16 (+ gap:10)
-                val ctx = LocalContext.current
-                val svgLoader = remember { ImageLoader.Builder(ctx).components { add(SvgDecoder.Factory()) }.build() }
-                AsyncImage(
-                    model = "file:///android_asset/logo.svg",
-                    imageLoader = svgLoader,
+                // Logo real do produto (public/logo.svg do frontend_web), convertido em
+                // vector drawable nativo (ic_pixgo_logo.xml) — mesma arte, sem SVG runtime.
+                Icon(
+                    painter = painterResource(R.drawable.ic_pixgo_logo),
                     contentDescription = "Pixgo",
-                    contentScale = ContentScale.Fit,
+                    tint = Color.Unspecified,
                     modifier = Modifier.height(18.dp).width((18f * 786f / 237f).dp).tap { onNavigate(MainDest.HOME) }
                 )
                 Spacer(Modifier.width(26.dp))

@@ -7,6 +7,7 @@ import io.pixgo.app.data.model.Plan
 import io.pixgo.app.data.model.Profile
 import io.pixgo.app.data.model.User
 import io.pixgo.app.data.network.DeviceActivateBody
+import io.pixgo.app.data.network.GoogleCredentialBody
 import io.pixgo.app.data.network.LoginBody
 import io.pixgo.app.data.network.NetworkModule
 import io.pixgo.app.data.network.RefreshBody
@@ -125,6 +126,37 @@ class AuthRepository(private val context: Context) {
         } finally {
             _state.value = _state.value.copy(loading = false)
         }
+    }
+
+    /**
+     * "Continuar com Google" — POST /api/auth/google no hub com o ID token
+     * (credential) obtido na WebView de login. Mesmo tratamento de sucesso
+     * de login(): token + refresh_token gravados, depois fetchMe(force) para
+     * trazer perfis/plano do pixel_service (padrão confirmado em
+     * api-core/node-functions/api/routes/auth.js).
+     */
+    suspend fun loginWithGoogleCredential(credential: String) {
+        _state.value = _state.value.copy(loading = true)
+        try {
+            val resp = apiCore.loginWithGoogle(GoogleCredentialBody(credential))
+            if (!resp.isSuccessful) throw ApiException(resp.code(), parseErrorMessage(resp) ?: "Google login failed")
+            val data = resp.body() ?: throw ApiException(resp.code(), "Empty response")
+            applyAuthResponse(data)
+            fetchMe(force = true)
+        } finally {
+            _state.value = _state.value.copy(loading = false)
+        }
+    }
+
+    /**
+     * Wrapper MÍNIMO sobre o mecanismo de token já existente, para o caso
+     * de o hub (HubLoginSheet) devolver o token via bridge JS em vez de só
+     * pelo cookie pixgo_session. Não altera login()/fetchMe()/
+     * loginWithDeviceCode()/loginWithGoogleCredential().
+     */
+    suspend fun storeExternalToken(token: String) {
+        tokenManager.setToken(token)
+        _state.value = _state.value.copy(token = token)
     }
 
     private suspend fun applyAuthResponse(data: AuthResponse) {

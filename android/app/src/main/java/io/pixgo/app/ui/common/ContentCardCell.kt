@@ -12,8 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import io.pixgo.app.R
 
 /**
  * Equivalente a components/ui/ContentCard.tsx — poster 2:3 + título por
@@ -28,9 +30,14 @@ fun ContentCardCell(
     modifier: Modifier = Modifier
 ) {
     Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)) {
+        // placeholder/error: arte real de "No Image" do frontend_web
+        // (public/placeholder.svg), replicando o onError -> thumb vazio do
+        // ContentCard.tsx original.
         AsyncImage(
             model = posterUrl,
             contentDescription = title,
+            placeholder = painterResource(R.drawable.img_placeholder),
+            error = painterResource(R.drawable.img_placeholder),
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)

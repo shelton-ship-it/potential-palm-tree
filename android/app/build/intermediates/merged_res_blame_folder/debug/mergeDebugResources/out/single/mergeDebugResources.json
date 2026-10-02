@@ -1,0 +1,62 @@
+[
+    {
+        "merged": "io.pixgo.app-debug-57:/drawable_img_placeholder.xml.flat",
+        "source": "io.pixgo.app-main-59:/drawable/img_placeholder.xml"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_montserrat_bold.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/montserrat_bold.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_poppins_semibold.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/poppins_semibold.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/drawable-v24_ic_launcher.xml.flat",
+        "source": "io.pixgo.app-main-59:/drawable-v24/ic_launcher.xml"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "io.pixgo.app-main-59:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_poppins_bold.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/poppins_bold.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_poppins_regular.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/poppins_regular.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/drawable_ic_launcher_background.xml.flat",
+        "source": "io.pixgo.app-main-59:/drawable/ic_launcher_background.xml"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_montserrat_black.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/montserrat_black.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_montserrat_extrabold.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/montserrat_extrabold.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_poppins_extrabold.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/poppins_extrabold.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/drawable_ic_pixgo_logo.xml.flat",
+        "source": "io.pixgo.app-main-59:/drawable/ic_pixgo_logo.xml"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_montserrat_semibold.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/montserrat_semibold.ttf"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "io.pixgo.app-main-59:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "io.pixgo.app-debug-57:/font_poppins_medium.ttf.flat",
+        "source": "io.pixgo.app-main-59:/font/poppins_medium.ttf"
+    }
+]
