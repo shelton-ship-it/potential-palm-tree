@@ -3,7 +3,7 @@ package io.pixgo.app.data.channels
 import android.content.Context
 import io.pixgo.app.data.auth.AuthRepository
 import io.pixgo.app.data.auth.TokenManager
-import io.pixgo.app.data.network.HeartbeatErrorBody
+import io.pixgo.app.data.model.StreamLimitErrorBody
 import io.pixgo.app.data.network.NetworkModule
 import io.pixgo.app.data.player.HeartbeatEvent
 import kotlinx.serialization.json.Json
@@ -71,8 +71,8 @@ class ChannelsRepository(context: Context, private val auth: AuthRepository) {
         }
     }
 
-    private fun parseErrorMessage(resp: Response<*>): HeartbeatErrorBody? {
+    private fun parseErrorMessage(resp: Response<*>): StreamLimitErrorBody? {
         val raw = resp.errorBody()?.string() ?: return null
-        return try { json.decodeFromString(HeartbeatErrorBody.serializer(), raw) } catch (e: Exception) { null }
+        return try { json.decodeFromString(StreamLimitErrorBody.serializer(), raw) } catch (e: Exception) { null }
     }
 }

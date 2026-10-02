@@ -2,8 +2,9 @@ package io.pixgo.app.data.player
 
 import android.content.Context
 import io.pixgo.app.data.auth.TokenManager
+import io.pixgo.app.data.model.StreamLimitErrorBody
+import io.pixgo.app.data.model.UpsellPlan
 import io.pixgo.app.data.network.HeartbeatBody
-import io.pixgo.app.data.network.HeartbeatErrorBody
 import io.pixgo.app.data.network.NetworkModule
 import io.pixgo.app.data.network.StreamResponse
 import kotlinx.coroutines.delay
@@ -11,14 +12,15 @@ import kotlinx.serialization.json.Json
 
 sealed class StreamHandshakeResult {
     data class Ok(val info: StreamResponse) : StreamHandshakeResult()
-    data class FreeTimeExhausted(val message: String?) : StreamHandshakeResult()
+    /** 429 no /stream — leva message + plans do body (RateLimitModal do frontend). */
+    data class FreeTimeExhausted(val message: String?, val plans: List<UpsellPlan> = emptyList()) : StreamHandshakeResult()
     data class Error(val message: String) : StreamHandshakeResult()
 }
 
 sealed class HeartbeatEvent {
     object Ok : HeartbeatEvent()
     data class SessionReplaced(val message: String) : HeartbeatEvent()
-    data class FreeTimeExhausted(val message: String?, val plans: List<String>) : HeartbeatEvent()
+    data class FreeTimeExhausted(val message: String?, val plans: List<UpsellPlan> = emptyList()) : HeartbeatEvent()
 }
 
 /**
@@ -52,7 +54,7 @@ class PlayerRepository(context: Context) {
                     ?: StreamHandshakeResult.Error("Resposta vazia do servidor.")
                 resp.code() == 429 -> {
                     val err = parseErrorBody(resp.errorBody()?.string())
-                    StreamHandshakeResult.FreeTimeExhausted(err?.message)
+                    StreamHandshakeResult.FreeTimeExhausted(err?.message, err?.plans ?: emptyList())
                 }
                 else -> StreamHandshakeResult.Error(
                     parseErrorBody(resp.errorBody()?.string())?.message ?: "Erro ${resp.code()} ao iniciar reprodução."
@@ -88,8 +90,8 @@ class PlayerRepository(context: Context) {
         }
     }
 
-    private fun parseErrorBody(raw: String?): HeartbeatErrorBody? {
+    private fun parseErrorBody(raw: String?): StreamLimitErrorBody? {
         if (raw.isNullOrBlank()) return null
-        return try { json.decodeFromString(HeartbeatErrorBody.serializer(), raw) } catch (e: Exception) { null }
+        return try { json.decodeFromString(StreamLimitErrorBody.serializer(), raw) } catch (e: Exception) { null }
     }
 }

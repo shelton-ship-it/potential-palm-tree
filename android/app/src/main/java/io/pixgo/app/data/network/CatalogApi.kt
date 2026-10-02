@@ -2,8 +2,11 @@ package io.pixgo.app.data.network
 
 import io.pixgo.app.data.model.CatalogResponse
 import io.pixgo.app.data.model.ContinueItem
+import io.pixgo.app.data.model.ContentDetail
 import io.pixgo.app.data.model.LegalResponse
+import io.pixgo.app.data.model.MyListCheckResponse
 import io.pixgo.app.data.model.MyListResponse
+import io.pixgo.app.data.model.ProgressUpdateBody
 import io.pixgo.app.data.model.SearchResponse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -52,6 +55,27 @@ interface CatalogApi {
 
     @POST("/api/mylist/remove")
     suspend fun removeFromMyList(@Body body: MyListMutationBody): Response<Unit>
+
+    /**
+     * GET /api/content/:id — usado por watch/[id]/page.tsx via
+     * contentApi.get(id, lang, profileId) (query: lang + profile_id opcional).
+     */
+    @GET("/api/content/{id}")
+    suspend fun content(
+        @Path("id") id: String,
+        @QueryMap params: Map<String, String>
+    ): Response<ContentDetail>
+
+    /** GET /api/mylist/check/:contentId?profileId= — myListApi.check do original. */
+    @GET("/api/mylist/check/{contentId}")
+    suspend fun checkMyList(
+        @Path("contentId") contentId: String,
+        @QueryMap params: Map<String, String>
+    ): Response<MyListCheckResponse>
+
+    /** POST /api/progress/update — progressApi.update (body camelCase confirmado em routes/progress.js). */
+    @POST("/api/progress/update")
+    suspend fun updateProgress(@Body body: ProgressUpdateBody): Response<Unit>
 
     /** routes/legal.js — público, sem sessão necessária. */
     @GET("/api/legal/{lang}")

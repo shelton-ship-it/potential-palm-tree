@@ -14,6 +14,8 @@ import retrofit2.http.Path
 import kotlinx.serialization.Serializable
 
 @Serializable data class LoginBody(val username: String, val password: String)
+/** POST /api/auth/google (hub) — body { credential } = ID token do Google Identity Services. */
+@Serializable data class GoogleCredentialBody(val credential: String)
 @Serializable data class RefreshBody(@kotlinx.serialization.SerialName("refresh_token") val refreshToken: String? = null)
 @Serializable data class DeviceActivateBody(val code: String)
 @Serializable data class UpdateMeBody(val name: String? = null, val email: String? = null)
@@ -36,6 +38,9 @@ interface ApiCoreAuthApi {
 
     @POST("/api/auth/register")
     suspend fun register(@Body body: Map<String, String>): Response<AuthResponse>
+
+    @POST("/api/auth/google")
+    suspend fun loginWithGoogle(@Body body: GoogleCredentialBody): Response<AuthResponse>
 
     @POST("/api/auth/device/activate")
     suspend fun activateDeviceCode(@Body body: DeviceActivateBody): Response<AuthResponse>

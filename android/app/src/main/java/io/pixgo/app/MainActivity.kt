@@ -27,6 +27,11 @@ import io.pixgo.app.ui.nav.MainDest
 import io.pixgo.app.ui.nav.PixGoScaffold
 import io.pixgo.app.ui.theme.PixGoTheme
 import io.pixgo.app.ui.theme.Px
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
+import io.pixgo.app.ui.auth.HubLoginSheet
 import kotlinx.coroutines.launch
 
 /**
@@ -73,7 +78,7 @@ fun PixGoNavHost(nav: NavHostController, authState: AuthState, app: PixGoApp) {
 
     NavHost(nav, startDestination = startDestination) {
         composable(Dest.Login.route) {
-            LoginScreen(loading = authState.loading)
+            LoginScreen()
         }
         composable(Dest.Home.route) {
             HomeShell(authState, app)
@@ -91,51 +96,113 @@ fun PixGoNavHost(nav: NavHostController, authState: AuthState, app: PixGoApp) {
     }
 }
 
-// FASE 2: esta tela ainda é o formulário provisório; o original (app/auth/login/page.tsx)
-// será reproduzido a partir do código real do frontend_web.
+/**
+ * Tela de entrada NATIVA que reproduz o fluxo REAL ativo do frontend_web:
+ *  - app/auth/login|register/page.tsx não têm formulário — redirecionam ao
+ *    hub (HubLoginSheet, WebView dedicada só à autenticação, como a
+ *    exceção já existente do checkout/FastWebViewSheet);
+ *  - app/auth/tv/page.tsx tem código numérico -> POST /api/auth/device/activate
+ *    (AuthRepository.loginWithDeviceCode, endpoint já confirmado em
+ *    api-core routes/device.js). Nada inventado.
+ */
 @Composable
-fun LoginScreen(loading: Boolean) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+fun LoginScreen() {
     val context = LocalContext.current
     val app = context.applicationContext as PixGoApp
+    val t = LocalTranslator.current
+    val authState by app.authRepository.state.collectAsStateWithLifecycle()
+    var hubMode by remember { mutableStateOf<String?>(null) }   // "login" | "register"
+    var tvMode by remember { mutableStateOf(false) }
+    var code by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    if (hubMode != null) {
+        HubLoginSheet(
+            mode = hubMode!!,
+            authRepository = app.authRepository,
+            onClose = { hubMode = null }
+        )
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().background(Px.BgDark).windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("PixGo", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Utilizador") })
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = password, onValueChange = { password = it }, label = { Text("Senha") },
-            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+        Image(
+            painter = painterResource(id = R.drawable.ic_pixgo_logo),
+            contentDescription = "PixGo",
+            modifier = Modifier.height(56.dp)
         )
-        error?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(32.dp))
+
         Button(
-            enabled = !loading,
-            onClick = {
-                error = null
-                scope.launch {
-                    try {
-                        app.authRepository.login(username, password)
-                    } catch (e: ApiException) {
-                        error = e.message
-                    } catch (e: Exception) {
-                        error = "Falha de rede."
-                    }
-                }
+            enabled = !authState.loading,
+            onClick = { hubMode = "login" },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Px.Primary),
+            shape = MaterialTheme.shapes.small
+        ) { Text(t.t("auth.signIn")) }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            enabled = !authState.loading,
+            onClick = { hubMode = "register" },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = MaterialTheme.shapes.small
+        ) { Text(t.t("auth.signUp")) }
+
+        Spacer(Modifier.height(24.dp))
+        TextButton(onClick = { tvMode = !tvMode; error = null }) {
+            Text(if (tvMode) t.t("common.cancel") else t.t("auth.tvCodeTitle"))
+        }
+        if (tvMode) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                t.t("auth.tvCodeSteps"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = code,
+                onValueChange = { nv -> code = nv.filter { it.isDigit() }.take(6) },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                label = { Text(t.t("auth.tvCodeTitle")) }
+            )
+            error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = MaterialTheme.colorScheme.error)
             }
-        ) {
-            if (loading) CircularProgressIndicator(modifier = Modifier.size(18.dp)) else Text("Entrar")
+            Spacer(Modifier.height(12.dp))
+            Button(
+                enabled = !authState.loading && code.length == 6,
+                onClick = {
+                    error = null
+                    scope.launch {
+                        try {
+                            app.authRepository.loginWithDeviceCode(code)
+                        } catch (e: ApiException) {
+                            code = ""
+                            error = when (e.status) {
+                                404 -> t.t("auth.tvCodeInvalid")
+                                410 -> t.t("auth.tvCodeExpired")
+                                409 -> t.t("auth.tvCodeUsed")
+                                else -> t.t("auth.tvActivateError")
+                            }
+                        } catch (e: Exception) {
+                            code = ""
+                            error = "Falha de rede."
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Px.Primary)
+            ) {
+                if (authState.loading) CircularProgressIndicator(modifier = Modifier.size(18.dp)) else Text(t.t("auth.signIn"))
+            }
         }
     }
 }
@@ -232,10 +299,19 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
         )
 
         watchContentId?.let { id ->
-            io.pixgo.app.ui.watch.PlayerScreen(
+            // Watch nativa (réplica de /main/watch/[id] ATIVO): chrome,
+            // ações, episódios, recomendações, progresso e modais em volta
+            // do PlayerScreen existente. Card → Watch direto; sem Content
+            // Detail (banida) e sem Bottom Nav (banida).
+            io.pixgo.app.ui.watch.WatchScreen(
                 contentId = id,
                 episodeId = null,
-                onClose = { watchContentId = null }
+                authState = authState,
+                catalogRepository = app.catalogRepository,
+                uiLang = langCode,
+                onClose = { watchContentId = null },
+                onOpenRecommendation = { cid -> watchContentId = cid },
+                onUpgrade = { plansWebView = true }
             )
         }
 
