@@ -152,7 +152,8 @@ fun LoginScreen() {
         // directo ao hub, como o redirect original.
         LaunchedEffect(Unit) {
             val uiCfg = context.resources.configuration
-            val isTvDevice = uiCfg.keyboard != android.content.res.Configuration.KEYBOARD_NONE ||
+            // Configuration.KEYBOARD (0x0F) — sem constante KEYBOARD_* pública.
+            val isTvDevice = (uiCfg.keyboard and 0x0F) == 0 ||
                 uiCfg.navigation == android.content.res.Configuration.NAVIGATION_DPAD ||
                 context.packageManager.hasSystemFeature("android.software.leanback")
             if (isTvDevice) tvMode = true else hubMode = "login"
