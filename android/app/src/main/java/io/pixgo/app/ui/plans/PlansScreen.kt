@@ -182,7 +182,6 @@ fun PlansScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     paymentMethods.map { m ->
                         AsyncImage(
-                            key = m.name,
                             model = "file:///android_asset/${m.asset}",
                             contentDescription = m.name,
                             contentScale = ContentScale.Fit,

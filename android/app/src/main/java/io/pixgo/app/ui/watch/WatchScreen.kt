@@ -615,6 +615,9 @@ private fun RateLimitDialog(
     onUpgrade: (planId: String) -> Unit
 ) {
     val t = LocalTranslator.current
+    // Calculado fora dos lambdas: text={} e confirmButton={} são irmãos —
+    // nenhum vê os vals locais do outro. Web real usa featured idêntico.
+    val featured = plans.find { it.billingCycle == "monthly" } ?: plans.firstOrNull()
     AlertDialog(
         onDismissRequest = onClose,
         containerColor = Px.CardBg,
@@ -625,7 +628,8 @@ private fun RateLimitDialog(
                     message ?: "Limite diário do plano gratuito atingido. Assine para streaming ilimitado.",
                     color = Px.TextMuted, fontSize = 13.sp, lineHeight = 20.sp
                 )
-                val featured = plans.find { it.billingCycle == "monthly" } ?: plans.firstOrNull()
+                // featured calculado no topo do composable (escopo comum a
+                // text={} e confirmButton={}).
                 if (featured != null) {
                     Spacer(Modifier.height(12.dp))
                     Column(
