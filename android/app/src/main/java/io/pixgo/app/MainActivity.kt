@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -21,7 +22,6 @@ import io.pixgo.app.data.auth.AuthState
 import io.pixgo.app.data.i18n.LocalTranslator
 import io.pixgo.app.data.i18n.Translator
 import io.pixgo.app.data.i18n.contentLangFor
-import io.pixgo.app.ui.common.DialogImmersive
 import io.pixgo.app.ui.common.applyImmersive
 import io.pixgo.app.ui.nav.MainDest
 import io.pixgo.app.ui.nav.PixGoScaffold
@@ -225,19 +225,25 @@ fun LoginScreen() {
 fun HomeShell(authState: AuthState, app: PixGoApp) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var current by remember { mutableStateOf(MainDest.HOME) }
+    // Estado de navegação sobrevivente a recomposição (ex.: rotação) — o
+    // padrão do web é URL-based; aqui persistimos o destino + contexto aberto.
+    val navSaved = rememberSaveable { mutableStateOf(MainDest.HOME) }
+    val watchSaved = rememberSaveable { mutableStateOf<String?>(null) }
+    val watchOfflineSaved = rememberSaveable {
+        mutableStateOf<Pair<String, String?>?>(null)
+    }
+    var current by navSaved
     var searchQuery by remember { mutableStateOf("") }
     val langCode by app.languageManager.languageCode.collectAsStateWithLifecycle(initialValue = "pt")
-    var uploadDialog by remember { mutableStateOf(false) }
     var plansWebView by remember { mutableStateOf(false) }
     // O aviso jurídico dos planos nunca é memorizado no web (PlansNoticeModal);
     // rearme a cada nova abertura do fluxo de checkout.
     var plansNoticeShown by remember { mutableStateOf(false) }
     LaunchedEffect(plansWebView) { if (plansWebView) plansNoticeShown = false }
-    var watchContentId by remember { mutableStateOf<String?>(null) }
+    var watchContentId by watchSaved
     // Abertura de download concluído pela tela Downloads → Watch em modo
     // offline (PlayerScreen usa PlayerRepository.startLocal; sem rede).
-    var watchOffline by remember { mutableStateOf<Pair<String, String?>?>(null) }
+    var watchOffline by watchOfflineSaved
     // Contagem real do badge — DownloadStore reconcilia DataStore + disco.
     val downloadsStore = remember { io.pixgo.app.data.download.DownloadStore(context) }
     var downloadsCount by remember { mutableStateOf(0) }
@@ -293,7 +299,6 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             // (equivalente de lib/downloads.ts + IndexedDB do web).
             downloadCount = downloadsCount,
             onOpenDownloads = { current = MainDest.DOWNLOADS },
-            onUpload = { uploadDialog = true },
             onUpgrade = { plansWebView = true },
             onSignOut = { scope.launch { app.authRepository.logout() } },
             suggest = { q -> app.catalogRepository.search(q, contentLangFor(langCode), limit = 6) },
@@ -338,6 +343,13 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                     onOpenPlans = { plansWebView = true }
                 )
                 MainDest.LEGAL -> io.pixgo.app.ui.legal.LegalScreen(legalRepository = app.legalRepository, uiLang = langCode)
+                // /main/upload real (page.tsx, 406 linhas) — formulário nativo com
+                // contrato uploadApi (copyright.pixgo.qzz.io). Substitui o antigo
+                // diálogo fictício "Uploads disponíveis no site apenas."
+                MainDest.UPLOAD -> io.pixgo.app.ui.upload.UploadScreen(
+                    authRepository = app.authRepository,
+                    onBack = { current = MainDest.HOME }
+                )
                 MainDest.DOWNLOADS -> io.pixgo.app.ui.downloads.DownloadsScreen(
                     authState = authState,
                     onOpenDownload = { cid, ep -> watchOffline = cid to ep },
@@ -425,15 +437,4 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
         }
     }
 
-    // FASE 2: /main/upload real (406 linhas no original) substitui este diálogo provisório.
-    if (uploadDialog) {
-        AlertDialog(
-            onDismissRequest = { uploadDialog = false },
-            confirmButton = {
-                TextButton(onClick = { uploadDialog = false }) { Text("OK") }
-            },
-            title = { Text("Enviar conteúdo") },
-            text = { DialogImmersive(); Text("Uploads disponíveis no site apenas.") }
-        )
-    }
 }

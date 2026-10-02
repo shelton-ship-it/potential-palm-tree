@@ -136,7 +136,7 @@ import kotlin.math.roundToInt
  * NAV do AppShell.tsx: home, catalog, channels(liveTV), mylist, search —
  * nessa ordem. ACCOUNT/LEGAL são as rotas /main/account e /main/legal.
  */
-enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, ACCOUNT, LEGAL }
+enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, UPLOAD, ACCOUNT, LEGAL }
 
 private val PxEase = CubicBezierEasing(0.25f, 0.46f, 0.45f, 0.94f)  // --transition-medium
 private val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)       // CSS `ease`
@@ -164,7 +164,6 @@ fun PixGoScaffold(
     onSelectLanguage: (String) -> Unit,
     downloadCount: Int,
     onOpenDownloads: () -> Unit,
-    onUpload: () -> Unit,
     onUpgrade: () -> Unit,
     onSignOut: () -> Unit,
     suggest: suspend (String) -> List<ContentItem>,
@@ -316,7 +315,7 @@ fun PixGoScaffold(
                             badge = { Badge("PRO", Color(0x14FFFFFF), Color(0x59FFFFFF), 9.6.sp) }
                         ) { onUpgrade(); closeSidebarOnMobile() }
                     }
-                    NavItem(t.t("nav.upload"), Icons.Filled.CloudUpload, false, color = Color(0x8CFFFFFF)) { onUpload(); closeSidebarOnMobile() }
+                    NavItem(t.t("nav.upload"), Icons.Filled.CloudUpload, current == MainDest.UPLOAD, color = Color(0x8CFFFFFF)) { onNavigate(MainDest.UPLOAD); closeSidebarOnMobile() }
                     NavItem(
                         t.t("nav.upgrade"), Icons.Filled.Bolt, false,
                         badge = if (!isPremium) {
@@ -511,7 +510,7 @@ fun PixGoScaffold(
                     MenuItem(onClick = { onNavigate(MainDest.MY_LIST); userMenuOpen = false }) { Text(t.t("nav.myList"), color = Px.TextMuted, fontSize = 14.sp) }
                     if (canDownload) MenuItem(onClick = { onOpenDownloads(); userMenuOpen = false }) { Text("Downloads", color = Px.TextMuted, fontSize = 14.sp) }
                     MenuSep()
-                    MenuItem(onClick = { onUpload(); userMenuOpen = false }) {
+                    MenuItem(onClick = { onNavigate(MainDest.UPLOAD); userMenuOpen = false }) {
                         Icon(Icons.Filled.CloudUpload, null, Modifier.size(15.dp), tint = Px.TextMuted)
                         Text(t.t("nav.upload"), color = Px.TextMuted, fontSize = 14.sp)
                     }

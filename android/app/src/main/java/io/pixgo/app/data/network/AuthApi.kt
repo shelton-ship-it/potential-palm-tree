@@ -1,6 +1,7 @@
 package io.pixgo.app.data.network
 
 import io.pixgo.app.data.model.AuthResponse
+import io.pixgo.app.data.model.PaymentPlan
 import io.pixgo.app.data.model.Plan
 import io.pixgo.app.data.model.Profile
 import io.pixgo.app.data.model.User
@@ -80,4 +81,17 @@ interface PixelServiceAuthApi {
 
     @DELETE("/api/auth/profiles/{id}")
     suspend fun deleteProfile(@Path("id") id: String): Response<Unit>
+}
+
+/**
+ * paymentsApi real de frontend_web/src/lib/api.ts →
+ * pixel_service_v1/node-functions/api/routes/payments.js (v3.0, Hotmart).
+ * GET /api/payments/plans devolve a lista directa de planos (Object/array já
+ * filtrado para os ids canónicos free/monthly/quarterly/annual com override
+ * de país aplicado). Só o método usado pelo fluxo activo do Android está
+ * portado — subscription/history/cancel não têm equivalente no app.
+ */
+interface PaymentsApi {
+    @GET("/api/payments/plans")
+    suspend fun plans(): Response<List<PaymentPlan>>
 }

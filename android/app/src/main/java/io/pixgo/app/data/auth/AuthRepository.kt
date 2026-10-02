@@ -51,6 +51,7 @@ class AuthRepository(private val context: Context) {
     private val tokenManager = TokenManager(context)
     private val apiCore by lazy { NetworkModule.apiCoreAuth(context, tokenManager) }
     private val pixelService by lazy { NetworkModule.pixelServiceAuth(context, tokenManager) }
+    private val paymentsApi by lazy { NetworkModule.payments(context, tokenManager) }
     private val uploadApi by lazy { NetworkModule.upload(tokenManager) }
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
@@ -158,6 +159,45 @@ class AuthRepository(private val context: Context) {
     suspend fun storeExternalToken(token: String) {
         tokenManager.setToken(token)
         _state.value = _state.value.copy(token = token)
+    }
+
+    /**
+     * Lê o localStorage da WebView do hub (pixgo_token / pixgo_refresh — as
+     * MESMAS chaves usadas pelo hub em src/store/auth.ts do frontend_web) e
+     * guarda-as no TokenManager nativo. Necessário porque o hub web entrega a
+     * sessão ao telemóvel via localStorage + cookie; num WebView isolado o
+     * cookie é importado (importCookiesFromWebView), mas o Bearer token só
+     * vive no localStorage da página — sem este passo, um utilizador que já
+     * estava autenticado no hub veria a WebView "sair de /auth/" sem token
+     * local e voltaria à tela de login (loop).
+     */
+    suspend fun storeHubTokens(token: String?, refreshToken: String?) {
+        var changed = false
+        if (!token.isNullOrBlank()) {
+            tokenManager.setToken(token)
+            _state.value = _state.value.copy(token = token)
+            changed = true
+        }
+        if (!refreshToken.isNullOrBlank()) {
+            tokenManager.setRefreshToken(refreshToken)
+            changed = true
+        }
+        if (changed) fetchMe(force = true)
+    }
+
+    // ── Plans (paymentsApi.plans() real em lib/api.ts → GET /api/payments/plans) ──
+
+    /**
+     * Réplica exacta do useEffect de frontend_web/src/app/main/plans/page.tsx:
+     * paymentsApi.plans().then(setPlans(filter p.id !== 'free')) — os preços/
+     * features vêm SEMPRE do backend (v3.0: "Preço, nome e features vêm SEMPRE
+     * do backend"). Erro propagado como ApiException para a página mostrar o
+     * mesmo estado de erro do web ("Não foi possível carregar os planos...").
+     */
+    suspend fun paymentPlans(): List<io.pixgo.app.data.model.PaymentPlan> {
+        val resp = retryOn401 { paymentsApi.plans() }
+        if (!resp.isSuccessful) throw ApiException(resp.code(), parseErrorMessage(resp) ?: "Failed to load plans")
+        return (resp.body() ?: emptyList()).filter { it.id != "free" }
     }
 
     // ── Upload (uploadApi real em lib/api.ts → copyright.pixgo.qzz.io) ──────
