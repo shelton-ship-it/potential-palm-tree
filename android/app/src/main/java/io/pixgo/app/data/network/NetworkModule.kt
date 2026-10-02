@@ -112,6 +112,10 @@ object NetworkModule {
     fun contact(tokenManager: TokenManager): ContactApi =
         retrofit(Hosts.COPYRIGHT, contactHttp(tokenManager)).create(ContactApi::class.java)
 
+    /** uploadApi do original (lib/api.ts) — mesmo Worker, mesmo cliente isolado. */
+    fun upload(tokenManager: TokenManager): UploadApi =
+        retrofit(Hosts.COPYRIGHT, contactHttp(tokenManager)).create(UploadApi::class.java)
+
     private fun retrofit(baseUrl: String, client: OkHttpClient): Retrofit {
         val contentType = "application/json".toMediaType()
         return Retrofit.Builder()

@@ -8,6 +8,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.io.IOException
 
 /**
@@ -29,7 +30,12 @@ import java.io.IOException
 @UnstableApi
 class BinDecryptDataSource(
     private val httpClient: OkHttpClient,
-    private val keyProvider: () -> ByteArray?
+    private val keyProvider: () -> ByteArray?,
+    // Resolução opcional para URLs "pixgo-offline://" dos downloads locais
+    // (equivalente Android do ramo offlineContentId do BinLoader original,
+    // que lia os bytes cifrados do IndexedDB em vez da rede). Default nulo
+    // = comportamento remoto exatamente como antes.
+    private val localResolver: ((Uri) -> File?)? = null
 ) : DataSource {
 
     private var uri: Uri? = null
@@ -43,15 +49,26 @@ class BinDecryptDataSource(
         uri = dataSpec.uri
         val url = dataSpec.uri.toString()
 
-        val raw = try {
-            httpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    throw IOException("HTTP ${resp.code} a buscar $url")
-                }
-                resp.body?.bytes() ?: ByteArray(0)
+        val raw = when {
+            // Ramo offline local: mesma origem de bytes diferente, resto do
+            // pipeline (decifra chunk-v2 abaixo) é idêntico ao remoto — tal
+            // como o comentário do FIX no loader original descreve.
+            dataSpec.uri.scheme == OfflineLocal.SCHEME -> {
+                val file = localResolver?.invoke(dataSpec.uri)
+                    ?: throw IOException("Segmento offline não encontrado para $url")
+                if (!file.exists()) throw IOException("Segmento offline ausente: $url")
+                file.readBytes()
             }
-        } catch (e: IOException) {
-            throw e
+            else -> try {
+                httpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                    if (!resp.isSuccessful) {
+                        throw IOException("HTTP ${resp.code} a buscar $url")
+                    }
+                    resp.body?.bytes() ?: ByteArray(0)
+                }
+            } catch (e: IOException) {
+                throw e
+            }
         }
 
         val payload = if (url.endsWith(".bin")) {
@@ -97,8 +114,21 @@ class BinDecryptDataSource(
     @UnstableApi
     class Factory(
         private val httpClient: OkHttpClient,
-        private val keyProvider: () -> ByteArray?
+        private val keyProvider: () -> ByteArray?,
+        private val localResolver: ((Uri) -> File?)? = null
     ) : DataSource.Factory {
-        override fun createDataSource(): DataSource = BinDecryptDataSource(httpClient, keyProvider)
+        override fun createDataSource(): DataSource =
+            BinDecryptDataSource(httpClient, keyProvider, localResolver)
     }
+}
+
+/**
+ * Esquema de URL usado pela playlist HLS sintética offline (equivalente do
+ * "idb://" original em ShakaPlayer.tsx buildOfflinePlaylist). Os URLs têm a
+ * forma pixgo-offline://{downloadKey}/init.bin e
+ * pixgo-offline://{downloadKey}/seg.bin?i=N; quem conhece o mapa
+ * downloadKey→pasta (DownloadStore) resolve para o File cifrado no disco.
+ */
+object OfflineLocal {
+    const val SCHEME = "pixgo-offline"
 }

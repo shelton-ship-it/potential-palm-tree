@@ -1,17 +1,19 @@
-# Build artifacts
-build/
+# Gradle
 .gradle/
 
-# IDE and system files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
+# Android Build Artifacts
+build/
+*.dex
+*.class
+*.jar
+*.so
+*.apk
+*.aar
+*.ap_
+*.aab
 
-# Environment and local config
-.env
-.env.local
-*.env.*
-local.properties
+# Kotlin Compiler Cache
+kotlin-classes/
+caches-jvm/
+local-state/
+classpath-snapshot/

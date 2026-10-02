@@ -88,6 +88,10 @@ fun PlayerScreen(
     // Fullscreen controlado pela Watch (portrait 16:9 ↔ janela inteira).
     // Default false preserva as chamadas existentes de Home/Canais.
     fullscreen: Boolean = false,
+    // Sessão offline (download concluído): quando true, salta handshake/
+    // heartbeat remotos e reproduz init+segmentos locais pelo MESMO
+    // BinDecryptDataSource (default false = fluxo remoto intacto).
+    offline: Boolean = false,
     onToggleFullscreen: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -104,10 +108,14 @@ fun PlayerScreen(
     // ShakaPlayer.tsx original (setAutoNextIn(5) + setInterval 1000ms).
     var autoNextIn by remember { mutableStateOf<Int?>(null) }
 
+    val downloadStore = remember { io.pixgo.app.data.download.DownloadStore(context) }
     val exoPlayer = remember(contentId, episodeId) {
         val dataSourceFactory = BinDecryptDataSource.Factory(
             httpClient = io.pixgo.app.data.network.NetworkModule.plainHttpClient(),
-            keyProvider = { drmKey }
+            keyProvider = { drmKey },
+            // Ramo offline: pixgo-offline://{key}/init.bin|seg.bin?i=N →
+            // ficheiro cifrado em disco; a decifra chunk-v2 abaixo é idêntica.
+            localResolver = { uri -> downloadStore.resolveLocal(uri) }
         )
         val mediaSourceFactory = HlsMediaSource.Factory(dataSourceFactory)
         ExoPlayer.Builder(context)
@@ -115,9 +123,31 @@ fun PlayerScreen(
             .build()
     }
 
-    LaunchedEffect(contentId, episodeId) {
+    LaunchedEffect(contentId, episodeId, offline) {
         loading = true
         errorMessage = null
+        if (offline) {
+            // Sessão offline: playlist sintética local + drm_key_hex do
+            // download concluído; handshake/heartbeat remotos são saltados
+            // (é o que isOfflineSession representa no repositório).
+            if (repository.startLocal(contentId, episodeId)) {
+                drmKey = repository.offlineKey()
+                val url = repository.offlineStreamUrl
+                if (url != null) {
+                    exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
+                    loading = false
+                } else {
+                    loading = false
+                    errorMessage = "Download indisponível."
+                }
+            } else {
+                loading = false
+                errorMessage = "Download incompleto ou expirado."
+            }
+            return@LaunchedEffect
+        }
         when (val result = repository.handshake(contentId, episodeId)) {
             is StreamHandshakeResult.Ok -> {
                 drmKey = BinFormat.keyFromHex(result.info.drmKeyHex)
@@ -143,8 +173,10 @@ fun PlayerScreen(
     }
 
     // Heartbeat — só corre enquanto isPlaying, tal como o listener
-    // play/pause do original que liga/desliga o setInterval.
-    LaunchedEffect(exoPlayer) {
+    // play/pause do original que liga/desliga o setInterval. Em sessões
+    // offline não há heartbeat remoto (sem streaming/licença remota).
+    LaunchedEffect(exoPlayer, offline) {
+        if (offline) return@LaunchedEffect
         while (true) {
             delay(PlayerRepository.HEARTBEAT_INTERVAL_MS)
             if (!exoPlayer.isPlaying) continue

@@ -51,6 +51,7 @@ class AuthRepository(private val context: Context) {
     private val tokenManager = TokenManager(context)
     private val apiCore by lazy { NetworkModule.apiCoreAuth(context, tokenManager) }
     private val pixelService by lazy { NetworkModule.pixelServiceAuth(context, tokenManager) }
+    private val uploadApi by lazy { NetworkModule.upload(tokenManager) }
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     private val refreshMutex = Mutex()
@@ -158,6 +159,44 @@ class AuthRepository(private val context: Context) {
         tokenManager.setToken(token)
         _state.value = _state.value.copy(token = token)
     }
+
+    // ── Upload (uploadApi real em lib/api.ts → copyright.pixgo.qzz.io) ──────
+
+    /** POST /precheck — payload idêntico ao formulário web. */
+    suspend fun uploadPrecheck(body: io.pixgo.app.data.network.UploadPrecheckRequest): UploadResult2 {
+        val resp = uploadApi.precheck(body)
+        if (!resp.isSuccessful) {
+            val raw = runCatching { resp.errorBody()?.string() }.getOrNull()
+            val msg = raw?.let { runCatching { json.decodeFromString<kotlinx.serialization.json.JsonObject>(it) }
+                .getOrNull()?.get("error")?.let { e -> (e as? kotlinx.serialization.json.JsonPrimitive)?.content } }
+            throw ApiException(resp.code(), msg ?: "Upload request failed")
+        }
+        val obj = resp.body() as? kotlinx.serialization.json.JsonObject ?: throw ApiException(resp.code(), "Empty response")
+        fun str(k: String): String? = (obj[k] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.takeIf { !it.isString || it.content != "null" }?.content
+        return UploadResult2(id = str("id") ?: "", status = str("status") ?: "pending")
+    }
+
+    /** GET /precheck-status/:id — polling de 15s enquanto pending no original. */
+    suspend fun uploadStatus(id: String): UploadResult2 {
+        val resp = uploadApi.status(id)
+        if (!resp.isSuccessful) throw ApiException(resp.code(), "Upload status failed")
+        val b = resp.body() ?: throw ApiException(resp.code(), "Empty response")
+        return UploadResult2(id = b.id ?: id, status = b.status ?: "pending")
+    }
+
+    data class UploadResult2(val id: String, val status: String)
+
+    suspend fun getUploadTermsAccepted(): Boolean = tokenManager.getUploadTermsAccepted()
+    suspend fun setUploadTermsAccepted(accepted: Boolean) = tokenManager.setUploadTermsAccepted(accepted)
+
+    /**
+     * Equivalente ao localStorage 'pixgo_disclaimer_dismissed' do gate real em
+     * Providers.tsx (DisclaimerGate). Reutiliza o mesmo DataStore do TokenManager;
+     * chave nova, nada existente alterado.
+     */
+    suspend fun isDisclaimerDismissed(): Boolean = tokenManager.isDisclaimerDismissed()
+    suspend fun setDisclaimerDismissed(dismissed: Boolean) = tokenManager.setDisclaimerDismissed(dismissed)
 
     private suspend fun applyAuthResponse(data: AuthResponse) {
         data.token?.let { tokenManager.setToken(it) }
