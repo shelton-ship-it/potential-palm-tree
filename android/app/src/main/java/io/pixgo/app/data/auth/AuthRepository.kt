@@ -160,6 +160,30 @@ class AuthRepository(private val context: Context) {
         _state.value = _state.value.copy(token = token)
     }
 
+    /**
+     * Lê o localStorage da WebView do hub (pixgo_token / pixgo_refresh — as
+     * MESMAS chaves usadas pelo hub em src/store/auth.ts do frontend_web) e
+     * guarda-as no TokenManager nativo. Necessário porque o hub web entrega a
+     * sessão ao telemóvel via localStorage + cookie; num WebView isolado o
+     * cookie é importado (importCookiesFromWebView), mas o Bearer token só
+     * vive no localStorage da página — sem este passo, um utilizador que já
+     * estava autenticado no hub veria a WebView "sair de /auth/" sem token
+     * local e voltaria à tela de login (loop).
+     */
+    suspend fun storeHubTokens(token: String?, refreshToken: String?) {
+        var changed = false
+        if (!token.isNullOrBlank()) {
+            tokenManager.setToken(token)
+            _state.value = _state.value.copy(token = token)
+            changed = true
+        }
+        if (!refreshToken.isNullOrBlank()) {
+            tokenManager.setRefreshToken(refreshToken)
+            changed = true
+        }
+        if (changed) fetchMe(force = true)
+    }
+
     // ── Upload (uploadApi real em lib/api.ts → copyright.pixgo.qzz.io) ──────
 
     /** POST /precheck — payload idêntico ao formulário web. */

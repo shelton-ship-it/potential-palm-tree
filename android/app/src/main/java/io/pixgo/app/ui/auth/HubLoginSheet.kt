@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,10 +65,11 @@ fun HubLoginSheet(mode: String, authRepository: AuthRepository, onClose: () -> U
     var loading by remember { mutableStateOf(true) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var closed by remember { mutableStateOf(false) }
+    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
 
     val startUrl = "$HUB_ORIGIN/auth/$mode?return_to=${android.net.Uri.encode("$HUB_ORIGIN/main")}"
 
-    fun finishAuth(url: String?) {
+    fun finishAuth() {
         if (closed) return
         closed = true
         // Importa pixgo_session etc. do webkit para o jar OkHttp ANTES de hidratar.
@@ -81,6 +83,59 @@ fun HubLoginSheet(mode: String, authRepository: AuthRepository, onClose: () -> U
         }
     }
 
+    /**
+     * Detecção fiável da saída da rota /auth/ no hub (equivalente ao
+     * `window.location.replace(returnTo)` pós-login do fluxo ativo):
+     *  - window.location.replace dentro do próprio hub (/auth/login → /main)
+     *    substitui a entrada de histórico e NEM SEMPRE dispara onPageFinished —
+     *    é precisamente isso que causava o loop "login → WebView → login".
+     *    Por isso verificamos também em doUpdateVisitedHistory e num polling
+     *    leve do URL enquanto a sheet está aberta;
+     *  - além da URL, exigimos sessão REAL antes de fechar: cookie
+     *    pixgo_session OU pixgo_token/pixgo_refresh no localStorage da WebView
+     *    (mesmas chaves de src/store/auth.ts do hub). Sem sessão confirmada a
+     *    sheet mantém-se aberta; com sessão, guardamos token+refresh
+     *    nativamente e hidratamos via fetchMe forçado (GET /api/auth/me),
+     *    exatamente como o hub faz após o redirect.
+     */
+    fun checkAuthed(candidateUrl: String?) {
+        if (closed) return
+        val wv = webViewRef ?: return
+        val currentUrl = candidateUrl ?: wv.url
+        if (currentUrl == null || currentUrl.contains("/auth/")) return
+        wv.evaluateJavascript(
+            "(function(){try{" +
+                "var c=document.cookie||'';" +
+                "return JSON.stringify({t:localStorage.getItem('pixgo_token')," +
+                "r:localStorage.getItem('pixgo_refresh'),hasCookie:c.indexOf('pixgo_session')>=0});" +
+                "}catch(e){return JSON.stringify({hasCookie:(document.cookie||'').indexOf('pixgo_session')>=0});}})()"
+        ) { raw ->
+            val decoded = runCatching {
+                // evaluateJavascript devolve uma STRING JSON — desempacota primeiro.
+                val inner = json.parseToJsonElement(raw ?: "{}")
+                (inner as? kotlinx.serialization.json.JsonPrimitive)?.content ?: raw
+            }.getOrDefault(raw)
+            val obj = runCatching { json.parseToJsonElement(decoded ?: "{}") as? kotlinx.serialization.json.JsonObject }.getOrNull()
+            fun str(key: String): String? =
+                (obj?.get(key) as? kotlinx.serialization.json.JsonPrimitive)
+                    ?.takeIf { !it.isString || (it.content != "null" && it.content.isNotBlank()) }
+                    ?.content
+            val tok = str("t")
+            val refresh = str("r")
+            val hasCookie = (obj?.get("hasCookie") as? kotlinx.serialization.json.JsonPrimitive)?.content == "true"
+            scope.launch {
+                if (tok == null && refresh == null && !hasCookie) {
+                    // Ainda sem sessão real — mantém o hub aberto (sem fechar em loop).
+                    return@launch
+                }
+                if (tok != null || refresh != null) authRepository.storeHubTokens(tok, refresh)
+                if (authRepository.state.value.token != null) finishAuth()
+                // Sem token mesmo após importar sessão → deixa a pessoa continuar
+                // o login no hub; nada fecha automaticamente.
+            }
+        }
+    }
+
     BackHandler {
         val wv = webViewRef
         if (wv != null && wv.canGoBack()) wv.goBack() else onClose()
@@ -88,6 +143,22 @@ fun HubLoginSheet(mode: String, authRepository: AuthRepository, onClose: () -> U
 
     DisposableEffect(Unit) {
         onDispose { webViewRef?.destroy() }
+    }
+
+    // Rede de segurança contra redirects SPA invisíveis aos callbacks do WebView
+    // (window.location.replace pode não disparar onPageFinished/doUpdateVisitedHistory):
+    // enquanto a sheet está aberta, verifica periodicamente se o hub já saiu de
+    // /auth/ com sessão real — e só então fecha com fetchMe(). Sem sessão, nada fecha.
+    var authCheckTick by remember { mutableStateOf(0) }
+    LaunchedEffect(authCheckTick) {
+        if (authCheckTick > 0 && !closed) checkAuthed(null)
+    }
+    DisposableEffect(Unit) {
+        val timer = java.util.Timer()
+        timer.scheduleAtFixedRate(object : java.util.TimerTask() {
+            override fun run() { authCheckTick++ }
+        }, 1_500L, 1_200L)
+        onDispose { timer.cancel() }
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0C))) {
@@ -118,18 +189,28 @@ fun HubLoginSheet(mode: String, authRepository: AuthRepository, onClose: () -> U
                         "PixGoNative"
                     )
                     webViewClient = object : WebViewClient() {
+                        // API >= 24: dispara para TODAS as cargas de página, incluindo
+                        // window.location.replace (que não chama onPageFinished quando a
+                        // mesma entrada de histórico é substituída). É o callback que fecha
+                        // o loop "login → WebView → login".
+                        override fun onReceivedError(
+                            view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?
+                        ) {
+                            if (request?.isForMainFrame == true) loading = false
+                        }
+
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                            loading = true
+                        }
+
                         override fun onPageFinished(view: WebView?, finishedUrl: String?) {
                             loading = false
-                            // Fluxo ativo: após o login o hub redireciona para
-                            // fora da rota de autenticacao — aqui isso significa "autenticado".
-                            val u = view?.url ?: finishedUrl
-                            if (u != null && !u.contains("/auth/")) finishAuth(u)
+                            checkAuthed(view?.url ?: finishedUrl)
                         }
 
                         override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                             loading = false
-                            val u = url ?: return
-                            if (!u.contains("/auth/")) finishAuth(u)
+                            checkAuthed(view?.url ?: url)
                         }
                     }
                     // Estado de login prévio (ex.: sessão guardada no jar) entra
