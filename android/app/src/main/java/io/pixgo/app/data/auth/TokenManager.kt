@@ -31,6 +31,8 @@ class TokenManager(private val context: Context) {
         private val KEY_ME_CACHE = stringPreferencesKey("pixgo_me_cache")
         private val KEY_UPLOAD_TERMS = booleanPreferencesKey("pixgo_upload_terms_accepted")
         private val KEY_DISCLAIMER_DISMISSED = booleanPreferencesKey("pixgo_disclaimer_dismissed")
+        private val KEY_PIXEL_GREETED = booleanPreferencesKey("pixgo_pixel_greeted")
+        private val KEY_PLANS_MODAL_SEEN = stringPreferencesKey("px_plans_modal_last_seen")
 
         const val ME_CACHE_TTL_MS = 30 * 60 * 1000L
         const val ME_CACHE_FREE_TTL_MS = 60 * 1000L
@@ -90,6 +92,16 @@ class TokenManager(private val context: Context) {
      */
     suspend fun isDisclaimerDismissed(): Boolean =
         context.authDataStore.data.first()[KEY_DISCLAIMER_DISMISSED] ?: false
+
+    /** PixelChatbot.tsx: GREETING_KEY 'pixgo_pixel_greeted' — balão proactivo só uma vez por dispositivo. */
+    suspend fun isPixelGreeted(): Boolean = context.authDataStore.data.first()[KEY_PIXEL_GREETED] ?: false
+    suspend fun setPixelGreeted() { context.authDataStore.edit { it[KEY_PIXEL_GREETED] = true } }
+
+    /** PlansModal.tsx: SEEN_KEY 'px_plans_modal_last_seen' (YYYY-MM-DD) — no máx. 1x por dia. */
+    suspend fun getPlansModalLastSeen(): String? = context.authDataStore.data.first()[KEY_PLANS_MODAL_SEEN]
+    suspend fun setPlansModalLastSeen(day: String) {
+        context.authDataStore.edit { it[KEY_PLANS_MODAL_SEEN] = day }
+    }
 
     suspend fun setDisclaimerDismissed(dismissed: Boolean) {
         context.authDataStore.edit { it[KEY_DISCLAIMER_DISMISSED] = dismissed }

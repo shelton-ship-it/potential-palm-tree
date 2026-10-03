@@ -275,6 +275,10 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             delay(3_000L)
         }
     }
+    // "Enviar conteúdo": no Android só abre o modal (envio é feito na plataforma web).
+    var showUploadWebOnly by remember { mutableStateOf(false) }
+    // Central de direitos autorais (/copyright, /copyright/response, /copyright/portal, /legal) em ecrã inteiro.
+    var showCopyright by remember { mutableStateOf(false) }
     var watchingChannel by remember { mutableStateOf<io.pixgo.app.data.channels.ChannelListItem?>(null) }
     // DisclaimerGate real (Providers.tsx): com sessão ativa, o DisclaimerModal
     // aparece até aceitar; "Recusar" memoriza pixgo_disclaimer_dismissed.
@@ -326,6 +330,8 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             suggest = { q -> app.catalogRepository.search(q, contentLangFor(langCode), limit = 6) },
             onOpenContent = { id -> watchContentId = id },
             onSubmitSearch = { q -> searchQuery = q; current = MainDest.SEARCH },
+            onUploadClick = { showUploadWebOnly = true },
+            onOpenCopyright = { showCopyright = true },
         ) {
             when (current) {
                 MainDest.HOME -> io.pixgo.app.ui.home.HomeScreen(
@@ -339,7 +345,14 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                     activeProfileId = authState.activeProfileId,
                     isKidProfile = activeProfile?.isKid == true,
                     uiLang = langCode,
-                    onOpenContent = { id -> watchContentId = id }
+                    onOpenContent = { id -> watchContentId = id },
+                    // PlansModal.tsx: isFree = !!user && (!user.plan_id || user.plan_id === 'free')
+                    isFreeUser = authState.user != null &&
+                        (authState.user.planId.isNullOrEmpty() || authState.user.planId == "free"),
+                    loadPlans = { app.authRepository.paymentPlans() },
+                    plansModalLastSeen = { app.authRepository.plansModalLastSeen() },
+                    markPlansModalSeen = { day -> app.authRepository.markPlansModalSeen(day) },
+                    onSeePlans = { openPlans() },
                 )
                 MainDest.MY_LIST -> io.pixgo.app.ui.mylist.MyListScreen(
                     catalogRepository = app.catalogRepository,
@@ -356,21 +369,20 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                 MainDest.LIVE_TV -> io.pixgo.app.ui.channels.ChannelsScreen(
                     repository = app.channelsRepository,
                     hasUser = authState.token != null,
-                    onOpenChannel = { ch -> watchingChannel = ch }
+                    onOpenChannel = { ch -> watchingChannel = ch },
+                    onUpgrade = { planId -> openPlans(planId) }
                 )
                 MainDest.ACCOUNT -> io.pixgo.app.ui.account.AccountScreen(
                     authRepository = app.authRepository,
                     contactRepository = app.contactRepository,
                     onForcedLogout = { current = MainDest.HOME },
-                    onOpenPlans = { openPlans() }
+                    onOpenPlans = { openPlans() },
+                    onOpenCopyright = { showCopyright = true }
                 )
-                MainDest.LEGAL -> io.pixgo.app.ui.legal.LegalScreen(legalRepository = app.legalRepository, uiLang = langCode)
-                // /main/upload real (page.tsx, 406 linhas) — formulário nativo com
-                // contrato uploadApi (copyright.pixgo.qzz.io). Substitui o antigo
-                // diálogo fictício "Uploads disponíveis no site apenas."
-                MainDest.UPLOAD -> io.pixgo.app.ui.upload.UploadScreen(
-                    authRepository = app.authRepository,
-                    onBack = { current = MainDest.HOME }
+                MainDest.LEGAL -> io.pixgo.app.ui.legal.LegalScreen(
+                    legalRepository = app.legalRepository,
+                    uiLang = langCode,
+                    onReportCopyright = { showCopyright = true }
                 )
                 MainDest.DOWNLOADS -> io.pixgo.app.ui.downloads.DownloadsScreen(
                     authState = authState,
@@ -393,6 +405,16 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        // main/layout.tsx renderiza <PixelChatbot /> ao lado do AppShell, em todas as páginas de /main.
+        // Fica por baixo dos ecrãs a ecrã inteiro (Watch/Canal) — o web também o oculta nesses modais.
+        if (watchContentId == null && watchOffline == null && watchingChannel == null && checkoutUrl == null && !showCopyright) {
+            io.pixgo.app.ui.chat.PixelChatbot(
+                isGreeted = { app.authRepository.isPixelGreeted() },
+                markGreeted = { app.authRepository.markPixelGreeted() },
+                send = { msg, hist -> app.contactRepository.chat(msg, hist) },
+            )
+        }
 
         watchContentId?.let { id ->
             // Watch nativa (réplica de /main/watch/[id] ATIVO): chrome,
@@ -446,11 +468,32 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
                     channelName = ch.name,
                     streamUrl = url,
                     channelsRepository = app.channelsRepository,
-                    onClose = { watchingChannel = null }
+                    onClose = { watchingChannel = null },
+                    onUpgrade = { planId -> watchingChannel = null; openPlans(planId) }
                 )
             } else {
                 LaunchedEffect(ch.id) { watchingChannel = null }
             }
+        }
+
+        // Central de direitos autorais: ecrã inteiro por cima do app (rotas /copyright/* e /legal públicas).
+        if (showCopyright) {
+            io.pixgo.app.ui.copyright.CopyrightHost(
+                repository = app.copyrightRepository,
+                legalRepository = app.legalRepository,
+                langCode = langCode,
+                onSelectLanguage = { code ->
+                    scope.launch {
+                        app.languageManager.setLanguage(code)
+                        app.authRepository.setLanguageServerSide(code)
+                    }
+                },
+                onClose = { showCopyright = false },
+            )
+        }
+
+        if (showUploadWebOnly) {
+            io.pixgo.app.ui.modals.UploadWebOnlyDialog(onClose = { showUploadWebOnly = false })
         }
 
         // Checkout REAL do hub (handleSubscribe de plans/page.tsx →

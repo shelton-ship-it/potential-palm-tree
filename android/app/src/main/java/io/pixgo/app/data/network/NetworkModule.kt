@@ -116,6 +116,10 @@ object NetworkModule {
     fun upload(tokenManager: TokenManager): UploadApi =
         retrofit(Hosts.COPYRIGHT, contactHttp(tokenManager)).create(UploadApi::class.java)
 
+    /** copyrightApi do original (lib/api.ts) — endpoints públicos, sem Authorization nem cookies. */
+    fun copyright(): CopyrightApi =
+        retrofit(Hosts.COPYRIGHT, plainHttpClient()).create(CopyrightApi::class.java)
+
     private fun retrofit(baseUrl: String, client: OkHttpClient): Retrofit {
         val contentType = "application/json".toMediaType()
         return Retrofit.Builder()

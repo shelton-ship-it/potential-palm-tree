@@ -5,6 +5,7 @@ import io.pixgo.app.data.auth.AuthRepository
 import io.pixgo.app.data.catalog.CatalogRepository
 import io.pixgo.app.data.channels.ChannelsRepository
 import io.pixgo.app.data.contact.ContactRepository
+import io.pixgo.app.data.copyright.CopyrightRepository
 import io.pixgo.app.data.download.DownloadEngine
 import io.pixgo.app.data.i18n.LanguageManager
 import io.pixgo.app.data.legal.LegalRepository
@@ -22,6 +23,8 @@ class PixGoApp : Application() {
         private set
     lateinit var contactRepository: ContactRepository
         private set
+    lateinit var copyrightRepository: CopyrightRepository
+        private set
     lateinit var legalRepository: LegalRepository
         private set
     lateinit var languageManager: LanguageManager
@@ -38,6 +41,7 @@ class PixGoApp : Application() {
         catalogRepository = CatalogRepository(this, authRepository)
         channelsRepository = ChannelsRepository(this, authRepository)
         contactRepository = ContactRepository(this)
+        copyrightRepository = CopyrightRepository(this)
         legalRepository = LegalRepository(this)
         languageManager = LanguageManager(this)
         downloadEngine = DownloadEngine(this)

@@ -68,6 +68,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -136,7 +137,7 @@ import kotlin.math.roundToInt
  * NAV do AppShell.tsx: home, catalog, channels(liveTV), mylist, search —
  * nessa ordem. ACCOUNT/LEGAL são as rotas /main/account e /main/legal.
  */
-enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, UPLOAD, PLANS, ACCOUNT, LEGAL }
+enum class MainDest { HOME, CATALOG, LIVE_TV, MY_LIST, SEARCH, DOWNLOADS, PLANS, ACCOUNT, LEGAL }
 
 private val PxEase = CubicBezierEasing(0.25f, 0.46f, 0.45f, 0.94f)  // --transition-medium
 private val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)       // CSS `ease`
@@ -169,6 +170,10 @@ fun PixGoScaffold(
     suggest: suspend (String) -> List<ContentItem>,
     onOpenContent: (String) -> Unit,
     onSubmitSearch: (String) -> Unit,
+    /** "Enviar conteúdo": no Android só abre o modal informando que o envio é feito na plataforma web. */
+    onUploadClick: () -> Unit,
+    /** Rota /copyright (Central de direitos autorais). */
+    onOpenCopyright: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val t = LocalTranslator.current
@@ -299,6 +304,11 @@ fun PixGoScaffold(
                     NavItem(t.t("nav.liveTV"), Icons.Filled.LiveTv, current == MainDest.LIVE_TV) { onNavigate(MainDest.LIVE_TV); closeSidebarOnMobile() }
                     NavItem(t.t("nav.myList"), Icons.Filled.Bookmark, current == MainDest.MY_LIST) { onNavigate(MainDest.MY_LIST); closeSidebarOnMobile() }
                     NavItem(t.t("nav.search"), Icons.Filled.Search, current == MainDest.SEARCH) { onNavigate(MainDest.SEARCH); closeSidebarOnMobile() }
+                    // AppShell: <Link href="/copyright" className="nav-item nav-report"> logo após "Pesquisar"
+                    NavItem(
+                        t.t("nav.reportCopyright"), Icons.Outlined.Flag, false,
+                        color = Px.TextLight, iconTint = Px.Primary,
+                    ) { onOpenCopyright(); closeSidebarOnMobile() }
 
                     Spacer(Modifier.height(22.dp))
                     SectionLabel("Conta")
@@ -316,7 +326,7 @@ fun PixGoScaffold(
                         // /main/plans (AppShell: Link href="/main/plans" quando free)
                         ) { onNavigate(MainDest.PLANS); closeSidebarOnMobile() }
                     }
-                    NavItem(t.t("nav.upload"), Icons.Filled.CloudUpload, current == MainDest.UPLOAD, color = Color(0x8CFFFFFF)) { onNavigate(MainDest.UPLOAD); closeSidebarOnMobile() }
+                    NavItem(t.t("nav.upload"), Icons.Filled.CloudUpload, false, color = Color(0x8CFFFFFF)) { onUploadClick(); closeSidebarOnMobile() }
                     // AppShell real: <Link href="/main/plans"> — "Fazer upgrade"
                     // navega para a tela de planos nativa (nunca abre o
                     // checkout directamente).
@@ -329,7 +339,7 @@ fun PixGoScaffold(
                     NavItem(t.t("nav.account"), Icons.Filled.Settings, current == MainDest.ACCOUNT) { onNavigate(MainDest.ACCOUNT); closeSidebarOnMobile() }
                     NavItem(t.t("legal.title"), Icons.Filled.Gavel, current == MainDest.LEGAL) { onNavigate(MainDest.LEGAL); closeSidebarOnMobile() }
                 }
-                SidebarFooter(onSignOut)
+                SidebarFooter(onSignOut, onReport = { onOpenCopyright(); closeSidebarOnMobile() })
             }
 
             // ── .header (z-index 1100: acima do sidebar e do overlay)
@@ -514,7 +524,7 @@ fun PixGoScaffold(
                     MenuItem(onClick = { onNavigate(MainDest.MY_LIST); userMenuOpen = false }) { Text(t.t("nav.myList"), color = Px.TextMuted, fontSize = 14.sp) }
                     if (canDownload) MenuItem(onClick = { onOpenDownloads(); userMenuOpen = false }) { Text("Downloads", color = Px.TextMuted, fontSize = 14.sp) }
                     MenuSep()
-                    MenuItem(onClick = { onNavigate(MainDest.UPLOAD); userMenuOpen = false }) {
+                    MenuItem(onClick = { userMenuOpen = false; onUploadClick() }) {
                         Icon(Icons.Filled.CloudUpload, null, Modifier.size(15.dp), tint = Px.TextMuted)
                         Text(t.t("nav.upload"), color = Px.TextMuted, fontSize = 14.sp)
                     }
@@ -722,6 +732,7 @@ private fun NavItem(
     active: Boolean,
     color: Color = Px.TextMuted,
     badge: (@Composable () -> Unit)? = null,
+    iconTint: Color? = null,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(Px.RadiusSm)
@@ -741,7 +752,7 @@ private fun NavItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(icon, null, Modifier.size(17.dp), tint = fg)
+            Icon(icon, null, Modifier.size(17.dp), tint = iconTint ?: fg)
             Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             badge?.invoke()
         }
@@ -754,11 +765,10 @@ private fun NavItem(
     }
 }
 
-/** `.sidebar-footer` — direitos autorais, link Android, sair. */
+/** `.sidebar-footer` — botão de denúncia de direitos autorais e sair. (Instalar/Baixar app não existem no APK.) */
 @Composable
-private fun SidebarFooter(onSignOut: () -> Unit) {
+private fun SidebarFooter(onSignOut: () -> Unit, onReport: () -> Unit) {
     val t = LocalTranslator.current
-    val ctx = LocalContext.current
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Column(
         Modifier.fillMaxWidth()
@@ -775,39 +785,19 @@ private fun SidebarFooter(onSignOut: () -> Unit) {
                 fontSize = 9.6.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.96.sp,
                 modifier = Modifier.padding(bottom = 7.dp)
             )
-            val shape = RoundedCornerShape(7.dp)
+            // .sidebar-report
+            val shape = RoundedCornerShape(Px.RadiusSm)
             Row(
-                Modifier.fillMaxWidth().clip(shape).background(Color(0x0FE50914)).border(1.dp, Color(0x26E50914), shape)
-                    .tap {
-                        ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${t.t("contact.copyrightEmail")}")))
-                    }
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(shape)
+                    .background(Color(0x1AE50914)).border(1.dp, Color(0x4DE50914), shape)
+                    .tap(onReport)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             ) {
-                Icon(Icons.Filled.Email, null, Modifier.size(13.dp), tint = Px.Primary)
-                Column {
-                    Text(t.t("contact.copyright"), color = Color(0x66FFFFFF), fontSize = 9.6.sp, fontWeight = FontWeight.Bold, lineHeight = 9.6.sp)
-                    Text(
-                        t.t("contact.copyrightEmail"), color = Px.Primary, fontSize = 10.08.sp, fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
+                Icon(Icons.Outlined.Flag, null, Modifier.size(16.dp), tint = Px.Primary)
+                Text(t.t("contact.reportCopyrightButton"), color = Px.TextLight, fontSize = 13.12.sp, fontWeight = FontWeight.Bold)
             }
-        }
-        // InstallPWAButton: o original não renderiza quando a app corre instalada/standalone
-        // (InstallPWAButton.tsx) — num APK é sempre o caso, logo não aparece.
-        val shape = RoundedCornerShape(7.dp)
-        Row(
-            Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp).fillMaxWidth().clip(shape)
-                .background(Color(0x0AFFFFFF)).border(1.dp, Color(0x14FFFFFF), shape)
-                .tap { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://app.pixgo.qzz.io/download/android"))) }
-                .padding(horizontal = 8.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
-        ) {
-            Icon(Icons.Filled.Android, null, Modifier.size(15.dp), tint = Color(0x99FFFFFF))
-            Text("Baixar app Android", color = Color(0x99FFFFFF), fontSize = 11.52.sp, fontWeight = FontWeight.SemiBold)
         }
         NavItem(t.t("nav.signOut"), Icons.Filled.Logout, false, onClick = onSignOut)
     }

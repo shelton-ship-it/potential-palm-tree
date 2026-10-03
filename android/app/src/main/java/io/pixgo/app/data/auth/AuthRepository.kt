@@ -237,6 +237,10 @@ class AuthRepository(private val context: Context) {
      */
     suspend fun isDisclaimerDismissed(): Boolean = tokenManager.isDisclaimerDismissed()
     suspend fun setDisclaimerDismissed(dismissed: Boolean) = tokenManager.setDisclaimerDismissed(dismissed)
+    suspend fun isPixelGreeted(): Boolean = tokenManager.isPixelGreeted()
+    suspend fun markPixelGreeted() = tokenManager.setPixelGreeted()
+    suspend fun plansModalLastSeen(): String? = tokenManager.getPlansModalLastSeen()
+    suspend fun markPlansModalSeen(day: String) = tokenManager.setPlansModalLastSeen(day)
 
     private suspend fun applyAuthResponse(data: AuthResponse) {
         data.token?.let { tokenManager.setToken(it) }

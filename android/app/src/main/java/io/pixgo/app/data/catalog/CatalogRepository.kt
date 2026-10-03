@@ -27,6 +27,7 @@ class CatalogRepository(private val context: Context, private val auth: AuthRepo
 
     companion object {
         const val ITEMS_LIMIT = 24
+        const val TRENDING_LIMIT = 60
     }
 
     private suspend fun <T> retryOn401(call: suspend () -> Response<T>): Response<T> {
@@ -49,6 +50,25 @@ class CatalogRepository(private val context: Context, private val auth: AuthRepo
         val resp = retryOn401 { api.list(params) }
         if (!resp.isSuccessful) return emptyList()
         return resp.body()?.items ?: emptyList()
+    }
+
+    /**
+     * Carrossel "Tendências" de app/main/page.tsx: mesma rota do catálogo
+     * (type=series, sort=recent, limit=60), filtrada no cliente pelo marcador
+     * de mini série (isChannelSeries). Falha silenciosa → lista vazia.
+     */
+    suspend fun loadTrending(activeProfileId: String?, lang: String, sort: String = "recent"): List<ContentItem> {
+        val params = mutableMapOf(
+            "limit" to TRENDING_LIMIT.toString(),
+            "page" to "1",
+            "sort" to sort,
+            "type" to "series",
+            "lang" to lang
+        )
+        activeProfileId?.let { params["profile_id"] = it }
+        val resp = retryOn401 { api.list(params) }
+        if (!resp.isSuccessful) return emptyList()
+        return (resp.body()?.items ?: emptyList()).filter { it.isChannelSeries }
     }
 
     suspend fun continueWatching(): List<ContinueItem> {
@@ -105,6 +125,16 @@ class CatalogRepository(private val context: Context, private val auth: AuthRepo
         val resp = retryOn401 { api.search(mapOf("q" to query, "limit" to limit.toString(), "lang" to lang)) }
         if (!resp.isSuccessful) return emptyList()
         return resp.body()?.results ?: emptyList()
+    }
+
+    /** search/page.tsx mostra `res.pagination.total` ("{total} resultados para"). */
+    data class SearchPage(val results: List<ContentItem>, val total: Int)
+
+    suspend fun searchPage(query: String, lang: String, limit: Int = 24): SearchPage {
+        val resp = retryOn401 { api.search(mapOf("q" to query, "limit" to limit.toString(), "lang" to lang)) }
+        if (!resp.isSuccessful) return SearchPage(emptyList(), 0)
+        val body = resp.body() ?: return SearchPage(emptyList(), 0)
+        return SearchPage(body.results, body.pagination?.total ?: 0)
     }
 
     /** Espelha app/main/mylist/page.tsx — profileId em camelCase, não profile_id. */

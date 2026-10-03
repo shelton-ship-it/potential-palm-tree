@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -69,6 +70,20 @@ import io.pixgo.app.data.model.ContentItem
 import io.pixgo.app.data.model.Episode
 import io.pixgo.app.data.model.UpsellPlan
 import io.pixgo.app.ui.theme.Px
+import io.pixgo.app.ui.theme.Montserrat
+import io.pixgo.app.ui.common.PxBadge
+import io.pixgo.app.ui.common.PxBadgeKind
+import io.pixgo.app.ui.common.PxBtnSize
+import io.pixgo.app.ui.common.PxBtnVariant
+import io.pixgo.app.ui.common.PxButton
+import io.pixgo.app.ui.common.PxLoadingRing
+import io.pixgo.app.ui.common.pxTap
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.material.icons.filled.Movie
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -86,6 +101,7 @@ import kotlin.math.roundToInt
  * evento 'ended' do player).
  */
 @androidx.media3.common.util.UnstableApi
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WatchScreen(
     contentId: String,
@@ -283,7 +299,7 @@ fun WatchScreen(
 
             if (loading) {
                 Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Px.Primary)
+                    PxLoadingRing()
                 }
             }
 
@@ -295,33 +311,36 @@ fun WatchScreen(
                             append(d.displayTitle)
                             activeEp?.let { e -> append(" · E${e.number ?: ""}: ${e.title ?: ""}") }
                         },
-                        fontFamily = MaterialTheme.typography.displaySmall.fontFamily,
+                        fontFamily = Montserrat,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 19.sp,
-                        color = Px.TextTitle,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        fontSize = 19.2.sp,
+                        letterSpacing = (-0.384).sp,           // -0.02em
+                        color = Px.TextLight,
                     )
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        d.type?.let { Badge(it.replaceFirstChar { c -> c.uppercase() }, Px.Primary.copy(alpha = 0.15f), Px.PrimaryGlow) }
-                        d.year?.let { Badge(it.toString(), Color(0x1FFFFFFF), Px.TextMuted) }
+                        d.type?.let { PxBadge(it.replaceFirstChar { c -> c.uppercase() }, PxBadgeKind.Red) }
+                        d.year?.let { PxBadge(it.toString(), PxBadgeKind.Gray) }
                         d.displayRating?.takeIf { it > 0 }?.let { r ->
                             Row(
                                 Modifier.background(Color(0x1AFFD700), RoundedCornerShape(999.dp))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    .padding(horizontal = 9.dp, vertical = 3.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Filled.Star, null, tint = Color(0xFFFFD700), modifier = Modifier.size(11.dp))
                                 Spacer(Modifier.width(3.dp))
-                                Text(String.format("%.1f", r), color = Color(0xFFFFD700), fontSize = 11.sp)
+                                Text(String.format(java.util.Locale.US, "%.1f", r), color = Color(0xFFFFD700), fontSize = 10.72.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
 
                     // ── Ações reais: Minha Lista | Baixar (gate) | Compartilhar ──
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    FlowRow(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
                         ActionChip(
                             label = if (inList) t.t("content.inList") else t.t("content.addToList"),
                             icon = if (inList) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd,
@@ -351,6 +370,7 @@ fun WatchScreen(
                                 else -> "Baixar"
                             },
                             icon = if (!canDownload) Icons.Filled.Lock else Icons.Filled.Download,
+                            ghost = !(offline || dlStatus == io.pixgo.app.data.download.DownloadStatus.COMPLETED),
                             onClick = {
                                 if (!canDownload) { onUpgrade(); return@ActionChip }
                                 if (offline || dlStatus == io.pixgo.app.data.download.DownloadStatus.COMPLETED) {
@@ -377,8 +397,9 @@ fun WatchScreen(
                             }
                         )
                         ActionChip(
-                            label = "Compartilhar",
+                            label = "",
                             icon = Icons.Filled.Share,
+                            ghost = true,
                             onClick = {
                                 // navigator.clipboard web → share-sheet nativo do link do conteúdo.
                                 val url = "https://pixgo.qzz.io/main/watch/$contentId"
@@ -394,17 +415,32 @@ fun WatchScreen(
                     // ── Descrição (card) — ep.description || meta.description || description ──
                     val desc = d.displayDescription
                     if (!desc.isNullOrBlank()) {
-                        CardBox { Text(desc, color = Px.TextMuted, fontSize = 13.sp, lineHeight = 21.sp) }
+                        CardBox(padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) { Text(desc, color = Px.TextMuted, fontSize = 13.44.sp, lineHeight = 22.85.sp) }
                         Spacer(Modifier.height(16.dp))
                     }
 
                     // ── Temporadas + Episódios ─────────────────────────────
                     if (isEpisodic && d.seasons.isNotEmpty()) {
-                        CardBox {
-                            Text(t.t("content.seasons"), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Px.TextTitle)
-                            Spacer(Modifier.height(8.dp))
+                        // .card + .card-header (border-bottom) + chips de temporada + lista com altura máx. 320
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(Px.CardBg).border(1.dp, Px.Border, RoundedCornerShape(12.dp))
+                        ) {
+                            Box(
+                                Modifier.fillMaxWidth().drawBehind {
+                                    drawLine(Px.Border, Offset(0f, size.height - 0.5.dp.toPx()), Offset(size.width, size.height - 0.5.dp.toPx()), 1.dp.toPx())
+                                }.padding(horizontal = 16.dp, vertical = 11.dp)
+                            ) {
+                                Text(t.t("content.seasons"), fontFamily = Montserrat, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Px.TextLight)
+                            }
                             if (d.seasons.size > 1) {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                LazyRow(
+                                    Modifier.fillMaxWidth().drawBehind {
+                                        drawLine(Px.Border, Offset(0f, size.height - 0.5.dp.toPx()), Offset(size.width, size.height - 0.5.dp.toPx()), 1.dp.toPx())
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
                                     items(d.seasons.size) { i ->
                                         SeasonChip(
                                             label = "${t.t("content.season")} ${d.seasons[i].number ?: (i + 1)}",
@@ -413,41 +449,38 @@ fun WatchScreen(
                                         )
                                     }
                                 }
-                                Spacer(Modifier.height(6.dp))
                             }
-                            d.seasons.getOrNull(activeSeason)?.episodes?.forEach { ep ->
-                                EpisodeRow(
-                                    ep = ep,
-                                    playing = ep.id == activeEp?.id,
-                                    onClick = {
-                                        activeEp = ep
-                                        lastSaveAt = 0L; lastPct = -1
-                                    }
-                                )
+                            Column(Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                                d.seasons.getOrNull(activeSeason)?.episodes?.forEach { ep ->
+                                    EpisodeRow(
+                                        ep = ep,
+                                        playing = ep.id == activeEp?.id,
+                                        onClick = {
+                                            activeEp = ep
+                                            lastSaveAt = 0L; lastPct = -1
+                                        }
+                                    )
+                                }
                             }
                         }
                         Spacer(Modifier.height(16.dp))
                     }
                 }
 
-                // ── Recomendados (sidebar do desktop; no mobile CSS empilha embaixo) ──
-                Column(Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        "Recomendados",
-                        fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Px.TextTitle,
-                        modifier = Modifier.padding(bottom = 10.dp)
-                    )
+                // ── Recomendados (.watch-sidebar; em ecrã estreito empilha por baixo) ──
+                Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                    Box(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp).drawBehind {
+                            drawLine(Px.Border, Offset(0f, size.height - 0.5.dp.toPx()), Offset(size.width, size.height - 0.5.dp.toPx()), 1.dp.toPx())
+                        }.padding(bottom = 8.dp)
+                    ) {
+                        Text("Recomendados", fontFamily = Montserrat, fontWeight = FontWeight.ExtraBold, fontSize = 13.6.sp, color = Px.TextTitle)
+                    }
                     if (recommendations.isEmpty()) {
-                        Text(
-                            "Sem recomendações disponíveis.",
-                            color = Px.TextMuted, fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 24.dp)
-                        )
+                        Text("Sem recomendações disponíveis.", color = Px.TextMuted, fontSize = 12.8.sp)
                     } else {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 24.dp)) {
-                            items(recommendations) { item ->
-                                RecommendCard(item) { onOpenRecommendation(item.id) }
-                            }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            recommendations.forEach { item -> RecommendCard(item) { onOpenRecommendation(item.id) } }
                         }
                     }
                 }
@@ -456,7 +489,7 @@ fun WatchScreen(
 
         // ── Rate limit modal (⏱ + message/plans REAIS do 429) ─────────────
         rateLimit?.let { (message, plans) ->
-            RateLimitDialog(
+            io.pixgo.app.ui.modals.RateLimitModal(
                 message = message,
                 plans = plans,
                 onClose = { rateLimit = null; onClose() },
@@ -466,7 +499,7 @@ fun WatchScreen(
 
         // ── Sessão substituída (🔒 + body.message do 409) ─────────────────
         sessionReplaced?.let { msg ->
-            SessionReplacedDialog(message = msg, onClose = { sessionReplaced = null; onClose() })
+            io.pixgo.app.ui.modals.SessionReplacedModal(message = msg, onClose = { sessionReplaced = null; onClose() })
         }
 
         // ── Toast temporário (sonner do original) ──────────────────────────
@@ -486,245 +519,125 @@ fun WatchScreen(
 
 // ─── helpers visuais (tokens do globals.css já portados em PixGoTheme) ───────
 
+/** `.btn .btn-sm` — secondary (por defeito) ou ghost; [label] vazio = só ícone. */
 @Composable
-private fun Badge(text: String, bg: Color, fg: Color) {
-    Text(
-        text, fontSize = 11.sp, color = fg, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.background(bg, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 3.dp)
+private fun ActionChip(label: String, icon: ImageVector, onClick: () -> Unit, ghost: Boolean = false) {
+    PxButton(
+        text = label, onClick = onClick, icon = icon,
+        variant = if (ghost) PxBtnVariant.Ghost else PxBtnVariant.Secondary,
+        size = PxBtnSize.Sm,
     )
 }
 
 @Composable
-private fun ActionChip(label: String, icon: ImageVector, onClick: () -> Unit) {
-    Row(
-        Modifier.background(Px.CardHover, RoundedCornerShape(6.dp))
-            .border(1.dp, Px.Border, RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = Px.TextLight, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, color = Px.TextLight, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun CardBox(content: @Composable () -> Unit) {
+private fun CardBox(padding: PaddingValues = PaddingValues(14.dp), content: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth()
             .background(Px.CardBg, RoundedCornerShape(12.dp))
             .border(1.dp, Px.Border, RoundedCornerShape(12.dp))
-            .padding(14.dp)
+            .padding(padding)
     ) { content() }
 }
 
+/** `.filter-chip.active` reduzido (0.74rem, padding 4/10). */
 @Composable
 private fun SeasonChip(label: String, active: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(999.dp)
     Text(
         label,
-        fontSize = 12.sp,
-        color = if (active) Px.PrimaryGlow else Px.TextMuted,
-        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+        fontSize = 11.84.sp,
+        color = if (active) Color.White else Px.TextMuted,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
         modifier = Modifier
-            .background(if (active) Px.Primary.copy(alpha = 0.12f) else Color.Transparent, RoundedCornerShape(999.dp))
-            .border(1.dp, if (active) Px.Primary.copy(alpha = 0.5f) else Px.Border, RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .clip(shape)
+            .background(if (active) Color(0x24E50914) else Color(0x0AFFFFFF))
+            .border(1.dp, if (active) Px.Primary else Px.Border, shape)
+            .pxTap(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
     )
 }
 
+/** `.episode-row` (+ `.ep-playing`: fundo vermelho 7% e barra esquerda de 3px). */
 @Composable
 private fun EpisodeRow(ep: Episode, playing: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth()
-            .background(
-                if (playing) Brush.horizontalGradient(listOf(Px.Primary.copy(alpha = 0.07f), Color.Transparent))
-                else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(if (playing) Color(0x12E50914) else Color.Transparent)
+            .drawBehind {
+                drawLine(Px.Border, Offset(0f, size.height - 0.5.dp.toPx()), Offset(size.width, size.height - 0.5.dp.toPx()), 1.dp.toPx())
+                drawRect(
+                    if (playing) Px.Primary else Color.Transparent,
+                    topLeft = Offset.Zero,
+                    size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)
+                )
+            }
+            .pxTap(onClick = onClick)
+            .padding(start = 15.dp, end = 12.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
-            Modifier.size(width = 72.dp, height = 40.dp).clip(RoundedCornerShape(4.dp))
-                .background(Px.BgDarker),
+            Modifier.size(width = 72.dp, height = 40.dp).clip(RoundedCornerShape(4.dp)).background(Px.BgDarker),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = ep.poster,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            if (ep.poster == null) {
+            if (!ep.poster.isNullOrBlank()) {
+                AsyncImage(
+                    model = ep.poster, contentDescription = null,
+                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                )
+            } else {
                 Icon(
-                    if (playing) Icons.Filled.PlayArrow else Icons.Filled.Star,
-                    null,
+                    if (playing) Icons.Filled.PlayArrow else Icons.Filled.Movie, null,
                     tint = if (playing) Px.Primary else Px.TextMuted,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(if (playing) 16.dp else 14.dp)
                 )
             }
         }
-        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 "E${ep.number ?: ""} · ${ep.title ?: ""}",
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                fontSize = 12.48.sp, fontWeight = FontWeight.SemiBold,
                 color = if (playing) Px.Primary else Px.TextTitle,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
             ep.duration?.takeIf { it > 0 }?.let {
-                Text("${it / 60}min", fontSize = 11.sp, color = Px.TextMuted)
+                Text("${it / 60}min", fontSize = 10.88.sp, color = Px.TextMuted, modifier = Modifier.padding(top = 1.dp))
             }
         }
     }
 }
 
+/** `.recommend-card`: miniatura 120×68 (16:9), título 2 linhas, tipo traduzido + ano. */
 @Composable
 private fun RecommendCard(item: ContentItem, onClick: () -> Unit) {
-    Row(
-        Modifier.width(220.dp).clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = item.displayPoster, contentDescription = item.displayTitle,
-            modifier = Modifier.size(width = 64.dp, height = 90.dp).clip(RoundedCornerShape(4.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                item.displayTitle, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Px.TextTitle,
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                listOfNotNull(item.type, item.year?.toString()).joinToString(" · "),
-                fontSize = 10.sp, color = Px.TextMuted
-            )
-        }
-    }
-}
-
-@Composable
-private fun RateLimitDialog(
-    message: String?,
-    plans: List<UpsellPlan>,
-    onClose: () -> Unit,
-    onUpgrade: (planId: String) -> Unit
-) {
     val t = LocalTranslator.current
-    // Calculado fora dos lambdas: text={} e confirmButton={} são irmãos —
-    // nenhum vê os vals locais do outro. Web real usa featured idêntico.
-    val featured = plans.find { it.billingCycle == "monthly" } ?: plans.firstOrNull()
-    AlertDialog(
-        onDismissRequest = onClose,
-        containerColor = Px.CardBg,
-        title = { Text("⏱ Limite diário atingido", color = Px.TextTitle, fontWeight = FontWeight.Black) },
-        text = {
-            Column {
-                Text(
-                    message ?: "Limite diário do plano gratuito atingido. Assine para streaming ilimitado.",
-                    color = Px.TextMuted, fontSize = 13.sp, lineHeight = 20.sp
-                )
-                // featured calculado no topo do composable (escopo comum a
-                // text={} e confirmButton={}).
-                if (featured != null) {
-                    Spacer(Modifier.height(12.dp))
-                    Column(
-                        Modifier.fillMaxWidth().background(Px.BgDarker, RoundedCornerShape(10.dp))
-                            .border(1.dp, Px.Primary, RoundedCornerShape(10.dp)).padding(14.dp)
-                    ) {
-                        Text(featured.name ?: "", fontSize = 12.sp, color = Px.TextMuted)
-                        Text(
-                            "por apenas ${featured.label ?: ""}",
-                            fontSize = 20.sp, fontWeight = FontWeight.Black, color = Px.TextTitle
-                        )
-                        featured.features.take(4).forEach { f ->
-                            Text("✓ $f", fontSize = 12.sp, color = Px.TextMuted)
-                        }
-                    }
-                }
-                val others = plans.filter { it.id != featured?.id }
-                if (others.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "Também disponível: ${others.joinToString(" · ") { it.label ?: it.id }}",
-                        fontSize = 11.sp, color = Px.TextMuted
-                    )
-                }
-            }
-        },
-        // Web real: onUpgrade={(planId) => { setShowRateLimit(false);
-        // router.push(`/main/plans?highlight=${planId}`); }}
-        confirmButton = {
-            TextButton(onClick = { onUpgrade(featured?.id ?: plans.firstOrNull()?.id ?: "") }) {
-                Text("Assinar", color = Px.PrimaryGlow)
-            }
-        },
-        dismissButton = { TextButton(onClick = onClose) { Text(t.t("common.close")) } }
-    )
-}
-
-@Composable
-private fun SessionReplacedDialog(message: String, onClose: () -> Unit) {
-    DialogShell(
-        title = "🔒 Sessão encerrada",
-        message = message,
-        primaryLabel = "Entendi",
-        onPrimary = onClose,
-    )
-}
-
-/**
- * Diálogo modal no padrão visual dos modais do frontend (UploadTermsModal/
- * UploadRulesModal/SessionReplacedModal): overlay rgba(0,0,0,.82), card
- * #121216 borda #1F1F26 raio 14, título Montserrat 800, corpo muted 13sp,
- * rodapé com botões. Reutilizado pela tela de Upload (uploadDialogs).
- */
-@Composable
-fun DialogShell(
-    title: String,
-    message: String,
-    primaryLabel: String,
-    onPrimary: () -> Unit,
-    secondaryLabel: String? = null,
-    onSecondary: (() -> Unit)? = null,
-) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0xD1000000)) // rgba(0,0,0,0.82)
-            .clickable(enabled = false) {},
-        contentAlignment = Alignment.Center,
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).pxTap(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Px.CardBg)
-                .border(1.dp, Px.Border, RoundedCornerShape(14.dp))
-                .padding(20.dp)
+        Box(
+            Modifier.size(width = 120.dp, height = 68.dp).clip(RoundedCornerShape(6.dp)).background(Px.BgDarker),
+            contentAlignment = Alignment.Center
         ) {
-            Text(title, color = Px.TextTitle, fontWeight = FontWeight.Black, fontSize = 17.sp)
-            Spacer(Modifier.height(10.dp))
-            Box(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                Text(message, color = Px.TextMuted, fontSize = 13.sp, lineHeight = 20.sp)
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (secondaryLabel != null && onSecondary != null) {
-                    TextButton(
-                        onClick = onSecondary,
-                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(Color(0xFF1A1A20)),
-                    ) { Text(secondaryLabel, color = Px.TextMuted, fontSize = 13.sp) }
+            if (!item.displayPoster.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.displayPoster, contentDescription = null,
+                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                )
+            } else Icon(Icons.Filled.Movie, null, Modifier.size(20.dp), tint = Px.TextMuted)
+        }
+        Column(Modifier.weight(1f).padding(end = 4.dp)) {
+            Text(
+                item.displayTitle, fontSize = 12.8.sp, fontWeight = FontWeight.SemiBold, color = Px.TextTitle,
+                lineHeight = 17.9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item.type?.let { ty ->
+                    Text(t.t("catalog.$ty").takeIf { it != "catalog.$ty" } ?: ty, fontSize = 11.2.sp, color = Px.TextMuted)
                 }
-                TextButton(
-                    onClick = onPrimary,
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(Px.Primary.copy(alpha = 0.15f)),
-                ) { Text(primaryLabel, color = Px.PrimaryGlow, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                item.year?.let { Text(it.toString(), fontSize = 11.2.sp, color = Px.TextMuted) }
             }
         }
     }

@@ -42,6 +42,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -410,7 +412,7 @@ internal fun UploadCard(padH: androidx.compose.ui.unit.Dp, padV: androidx.compos
 
 @Composable
 internal fun UploadFieldLabel(text: String) {
-    Text(text, color = Px.TextTitle, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
+    Text(text, color = Px.TextMuted, fontSize = 12.32.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 5.dp))
 }
 
 @Composable
@@ -426,15 +428,16 @@ internal fun UploadInput(
         onValueChange = onChange,
         singleLine = !multiLine,
         minLines = if (multiLine) 3 else 1,
-        textStyle = TextStyle(color = Px.TextTitle, fontSize = 13.sp),
-        cursorBrush = SolidColor(Px.PrimaryGlow),
+        textStyle = TextStyle(fontFamily = io.pixgo.app.ui.theme.Poppins, color = Px.TextLight, fontSize = 14.4.sp),
+        cursorBrush = SolidColor(Px.TextLight),
         keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text),
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Px.RadiusSm))
-            .background(Color(0xFF0E0E12)).border(1.dp, Px.Border, RoundedCornerShape(Px.RadiusSm))
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .background(Color(0x0DFFFFFF)).border(1.dp, Px.Border, RoundedCornerShape(Px.RadiusSm))
+            .heightIn(min = if (multiLine) 90.dp else 44.dp)
+            .padding(horizontal = 14.dp, vertical = if (multiLine) 10.dp else 0.dp),
         decorationBox = { inner ->
-            Box {
-                if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, color = Px.TextMuted.copy(alpha = 0.6f), fontSize = 13.sp)
+            Box(Modifier.heightIn(min = if (multiLine) 70.dp else 44.dp), contentAlignment = if (multiLine) Alignment.TopStart else Alignment.CenterStart) {
+                if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, color = Px.TextMuted.copy(alpha = 0.6f), fontSize = 14.4.sp)
                 inner()
             }
         },
@@ -448,12 +451,13 @@ internal fun UploadDropdown(options: List<Pair<String, String>>, selected: Strin
     Box {
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(Px.RadiusSm))
-                .background(Color(0xFF0E0E12)).border(1.dp, Px.Border, RoundedCornerShape(Px.RadiusSm))
-                .clickable { open = !open }.padding(horizontal = 10.dp, vertical = 9.dp),
+                .background(Color(0x0DFFFFFF)).border(1.dp, Px.Border, RoundedCornerShape(Px.RadiusSm))
+                .heightIn(min = 44.dp)
+                .clickable { open = !open }.padding(horizontal = 14.dp, vertical = 0.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(sel, color = Px.TextTitle, fontSize = 13.sp)
+            Text(sel, color = Px.TextLight, fontSize = 14.4.sp)
             Icon(Icons.Filled.ExpandMore, null, Modifier.size(16.dp), tint = Px.TextMuted)
         }
         if (open) {
@@ -478,12 +482,15 @@ internal fun UploadDropdown(options: List<Pair<String, String>>, selected: Strin
 internal fun UploadButton(label: String, enabled: Boolean = true, primary: Boolean = true, onClick: () -> Unit) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(Px.RadiusSm))
-            .background(if (primary) Px.Primary else Color(0xFF1A1A20))
+            .background(if (primary) Px.Primary else Color(0x12FFFFFF))
+            .then(if (primary) Modifier else Modifier.border(1.dp, Px.Border, RoundedCornerShape(Px.RadiusSm)))
+            .alpha(if (enabled) 1f else 0.42f)
+            .heightIn(min = 40.dp)
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (primary) Color.White else Px.TextTitle, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = if (primary) Color.White else Px.TextLight, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -1,5 +1,18 @@
 package io.pixgo.app.ui.plans
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import io.pixgo.app.ui.common.PxBadge
+import io.pixgo.app.ui.common.PxBadgeKind
+import io.pixgo.app.ui.common.PxBtnVariant
+import io.pixgo.app.ui.common.PxButton
+import io.pixgo.app.ui.common.PxPageHeader
+import io.pixgo.app.ui.common.PxPageLoading
+import io.pixgo.app.ui.common.pagePadding
+
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,6 +57,7 @@ import io.pixgo.app.data.auth.AuthRepository
 import io.pixgo.app.data.i18n.LocalTranslator
 import io.pixgo.app.data.model.PaymentPlan
 import io.pixgo.app.data.model.Plan
+import io.pixgo.app.ui.theme.Montserrat
 import io.pixgo.app.ui.theme.Px
 
 /**
@@ -75,6 +89,7 @@ private val PAYMENT_METHODS = listOf(
 )
 private val MPESA_METHOD = PaymentMethod("M-Pesa", "payment-icons/M-PESA_LOGO-01.svg")
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlansScreen(
     authRepository: AuthRepository,
@@ -112,21 +127,15 @@ fun PlansScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Px.BgDark)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(pagePadding()),
     ) {
-        Column(Modifier.fillMaxWidth().widthIn(max = 1100.dp)) {
-            Text(t.t("plans.title"), color = Px.TextTitle, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-            Text(
-                t.t("plans.subtitle"),
-                color = Px.TextMuted,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+        // .page-header: título + subtítulo (+ selo M-Pesa quando a moeda é MZN)
+        Column(Modifier.fillMaxWidth()) {
+            PxPageHeader(title = t.t("plans.title"), subtitle = t.t("plans.subtitle"))
             if (isMZN) {
                 Row(
-                    Modifier.padding(top = 10.dp),
+                    Modifier.padding(top = 0.dp, bottom = 22.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -136,18 +145,12 @@ fun PlansScreen(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.height(26.dp),
                     )
-                    Text(t.t("plans.payWithMpesa"), color = Px.TextTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(t.t("plans.payWithMpesa"), color = Px.TextLight, fontSize = 13.6.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
 
-        Spacer(Modifier.height(18.dp))
-
-        if (loading) {
-            Box(Modifier.fillMaxWidth().heightIn(min = 220.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Px.Primary, modifier = Modifier.size(28.dp))
-            }
-        }
+        if (loading) PxPageLoading()
 
         if (!loading && error) {
             // Texto literal idêntico ao fallback da página web.
@@ -159,8 +162,9 @@ fun PlansScreen(
         }
 
         if (!loading && !error) {
-            Column(
-                Modifier.fillMaxWidth().widthIn(max = 1100.dp),
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 plans.forEach { p ->
@@ -171,6 +175,7 @@ fun PlansScreen(
                         isCurrent = isCurrent,
                         isFeatured = isFeatured,
                         onSubscribe = { handleSubscribe(p.id) },
+                        modifier = Modifier.widthIn(min = 260.dp, max = 340.dp).fillMaxWidth(),
                     )
                 }
             }
@@ -196,62 +201,50 @@ fun PlansScreen(
     }
 }
 
+/** `.plan-card` (+ `.featured`): borda 2px, raio 12, padding 22; destaque = borda primária, brilho e barra de 3px em gradiente. */
 @Composable
 private fun PlansCard(
     plan: PaymentPlan,
     isCurrent: Boolean,
     isFeatured: Boolean,
     onSubscribe: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(Px.Radius)
-    Column(
-        Modifier
-            .fillMaxWidth()
+    Box(
+        modifier
+            .then(
+                if (isFeatured) Modifier.shadow(14.dp, shape, ambientColor = Px.Primary.copy(alpha = 0.16f), spotColor = Px.Primary.copy(alpha = 0.16f))
+                else Modifier
+            )
             .clip(shape)
             .background(Px.CardBg)
-            .border(1.dp, if (isFeatured) Px.Primary.copy(alpha = 0.5f) else Px.Border, shape)
-            .padding(20.dp),
+            .border(2.dp, if (isFeatured) Px.Primary else Px.Border, shape)
     ) {
         if (isFeatured) {
             Box(
-                Modifier.align(Alignment.End).clip(RoundedCornerShape(6.dp)).background(Px.Primary)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text("Melhor valor", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Modifier.fillMaxWidth().height(3.dp).align(Alignment.TopStart)
+                    .background(Brush.horizontalGradient(listOf(Px.Primary, Px.Accent)))
+            )
+            PxBadge("Melhor valor", PxBadgeKind.Red, Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 14.dp))
+        }
+        Column(Modifier.padding(22.dp)) {
+            Text(plan.name, color = Px.TextLight, fontFamily = Montserrat, fontWeight = FontWeight.ExtraBold, fontSize = 17.6.sp, modifier = Modifier.padding(bottom = 4.dp))
+            Text(plan.label ?: "", color = Px.TextLight, fontWeight = FontWeight.Black, fontSize = 24.sp, modifier = Modifier.padding(bottom = 14.dp))
+            Column(Modifier.padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                plan.features.forEach { f -> FeatureRow(f) }
+                val profiles = plan.maxProfiles ?: 1
+                FeatureRow("$profiles " + if (profiles == 1) "perfil" else "perfis")
+                FeatureRow(
+                    if (plan.maxDownloads == null) "Downloads ilimitados"
+                    else "Até ${plan.maxDownloads} downloads/mês"
+                )
             }
-            Spacer(Modifier.height(8.dp))
-        }
-        Text(plan.name, color = Px.TextTitle, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(plan.label ?: "", color = Px.TextTitle, fontWeight = FontWeight.Black, fontSize = 24.sp)
-        Spacer(Modifier.height(14.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            plan.features.forEach { f -> FeatureRow(f) }
-            val profiles = plan.maxProfiles ?: 1
-            FeatureRow("$profiles " + if (profiles == 1) "perfil" else "perfis")
-            FeatureRow(
-                if (plan.maxDownloads == null) "Downloads ilimitados"
-                else "Até ${plan.maxDownloads} downloads/mês"
-            )
-        }
-        Spacer(Modifier.height(20.dp))
-        val btnShape = RoundedCornerShape(Px.RadiusSm)
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clip(btnShape)
-                .background(if (isCurrent) Color(0xFF1A1A20) else Px.Primary)
-                .then(if (isCurrent) Modifier else Modifier.clickable(onClick = onSubscribe))
-                .padding(vertical = 11.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                if (isCurrent) "Plano atual" else "Assinar",
-                color = if (isCurrent) Px.TextMuted else Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-            )
+            if (isCurrent) {
+                PxButton("Plano atual", onClick = {}, enabled = false, variant = PxBtnVariant.Secondary, modifier = Modifier.fillMaxWidth())
+            } else {
+                PxButton("Assinar", onClick = onSubscribe, modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }
@@ -260,6 +253,6 @@ private fun PlansCard(
 private fun FeatureRow(text: String) {
     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(Icons.Filled.Check, null, Modifier.size(16.dp), tint = Px.Secondary)
-        Text(text, color = Px.TextMuted, fontSize = 13.sp, lineHeight = 19.sp)
+        Text(text, color = Px.TextMuted, fontSize = 13.44.sp, lineHeight = 20.sp)
     }
 }

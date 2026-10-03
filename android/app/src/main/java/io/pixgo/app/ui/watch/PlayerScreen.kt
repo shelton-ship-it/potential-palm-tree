@@ -255,20 +255,14 @@ fun PlayerScreen(
     // tratamento via callbacks (chamadas antigas Home/Canais/deep-link ficam
     // com exatamente o comportamento anterior).
     sessionReplacedMessage?.let { msg ->
-        AlertDialog(
-            onDismissRequest = { sessionReplacedMessage = null; onClose() },
-            title = { Text("Sessão encerrada") },
-            text = { Text(msg) },
-            confirmButton = { TextButton(onClick = { sessionReplacedMessage = null; onClose() }) { Text("OK") } }
-        )
+        io.pixgo.app.ui.modals.SessionReplacedModal(message = msg, onClose = { sessionReplacedMessage = null; onClose() })
     }
 
     freeTimeMessage?.let { msg ->
-        AlertDialog(
-            onDismissRequest = { freeTimeMessage = null; onClose() },
-            title = { Text("Tempo grátis esgotado") },
-            text = { Text(msg) },
-            confirmButton = { TextButton(onClick = { freeTimeMessage = null; onClose() }) { Text("OK") } }
+        io.pixgo.app.ui.modals.RateLimitModal(
+            plans = emptyList(), message = msg,
+            onClose = { freeTimeMessage = null; onClose() },
+            onUpgrade = { freeTimeMessage = null; onClose() },
         )
     }
 

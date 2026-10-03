@@ -2,7 +2,6 @@ package io.pixgo.app.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,64 +21,56 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import io.pixgo.app.data.i18n.LocalTranslator
 import io.pixgo.app.ui.theme.Px
 
 /**
  * Réplica 1:1 de components/ui/ContentCard.tsx (+ .content-card/.content-thumb/
  * .content-info/.content-type-bar/.content-progress/card-action-btn em
- * globals.css):
+ * globals.css, incluindo as reduções do breakpoint <=768px):
  *  - thumb 2:3 (ou 16:9 quando wide) com poster, placeholder gradiente
- *    (MovieIcon + título — não imagem estática), barra de tipo colorida de 3px
- *    no topo (TYPE_COLORS verbatim do original), badge de rating dourado
- *    top-right (rgba(0,0,0,0.78)), badge de tipo traduzido bottom-left
- *    (rgba(0,0,0,0.72), chaves catalog.*), barra de progresso 3px;
- *  - info: padding 8/10/10, título 0.8rem/600 duas linhas line-height 1.4,
- *    meta 0.7rem com ano + rating (#ffd700);
- *  - ações: botões 32×32 radius 6 (Add/Check quando inList, Share), separador
- *    superior 1px — só aparecem quando os callbacks são passados, tal como o
- *    condicional {(onAddToList || onShare)} do original.
- * Hover-overlay de play NÃO é replicado: no web ele só existe sob
- * @media (hover:hover) e pointer:fine (comentário explícito em ContentCard.tsx
- * — toque no telemóvel deixá-lo-ia preso). Em Android equivaleria a um estado
- * pressed sem pedido no frontend, portanto foi omitido por decisão informada.
+ *    (MovieIcon + título), barra de tipo colorida de 3px no topo, badge de
+ *    rating dourado top-right, badge de tipo traduzido (t(`catalog.${type}`))
+ *    bottom-left, barra de progresso 3px;
+ *  - info: padding 8/10/10 (<=768px: 6/8/8; wide: 7/9/8), título 0.8rem/600
+ *    duas linhas (<=768px 0.74rem), meta com ano + rating (#ffd700);
+ *  - ações: botões 32×32 (<=768px 28×28) radius 6, separador superior 1px —
+ *    só aparecem quando os callbacks são passados.
+ * Hover-overlay de play NÃO é replicado: no web só existe sob
+ * @media (hover:hover) and (pointer:fine) (ver comentário em ContentCard.tsx).
  */
 
-/** TYPE_COLORS literal de ContentCard.tsx (ordem irrelevante). */
+/** TYPE_COLORS literal de ContentCard.tsx. */
 private val TYPE_COLORS = mapOf(
-    "movie"       to Color(0xFFE50914),
-    "series"      to Color(0xFFFF6B00),
-    "anime"       to Color(0xFFFF0080),
+    "movie" to Color(0xFFE50914),
+    "series" to Color(0xFFFF6B00),
+    "anime" to Color(0xFFFF0080),
     "documentary" to Color(0xFF00A8FF),
-    "dorama"      to Color(0xFF9C27B0),
-    "channel"     to Color(0xFF1CE783)
-)
-
-/** t(`catalog.${type}`) — mesmas chaves/valores de assets/locales/pt.json. */
-private val CATALOG_TYPE_LABELS = mapOf(
-    "movie" to "Filmes",
-    "series" to "Séries",
-    "anime" to "Anime",
-    "documentary" to "Documentários",
-    "dorama" to "Animações",
-    "channel" to "Canais"
+    "dorama" to Color(0xFF9C27B0),
+    "channel" to Color(0xFF1CE783)
 )
 
 private fun fmtRating(r: Double?): String? =
-    if (r == null || r <= 0.0) null else String.format("%.1f", r)
+    if (r == null || r <= 0.0) null else String.format(java.util.Locale.US, "%.1f", r)
 
 @Composable
 fun ContentCardCell(
@@ -97,17 +88,33 @@ fun ContentCardCell(
     onAddToList: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null
 ) {
-    // const typeColor = type ? (TYPE_COLORS[type] ?? '#e50914') : '#e50914'
+    val t = LocalTranslator.current
+    val compact = LocalConfiguration.current.screenWidthDp <= 768
     val typeColor = if (type != null) TYPE_COLORS[type] ?: Px.Primary else Px.Primary
     val ratingStr = fmtRating(rating)
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(Px.Radius)
+
+    // .content-info padding / tipografia (+ overrides de .content-card--wide e <=768px)
+    val infoStart: Int; val infoTop: Int; val infoEnd: Int; val infoBottom: Int
+    when {
+        wide -> { infoStart = 9; infoTop = 7; infoEnd = 9; infoBottom = 8 }
+        compact -> { infoStart = 8; infoTop = 6; infoEnd = 8; infoBottom = 8 }
+        else -> { infoStart = 10; infoTop = 8; infoEnd = 10; infoBottom = 10 }
+    }
+    val titleSize = when { wide -> 12.48.sp; compact -> 11.84.sp; else -> 12.8.sp }
+    val titleLine = if (compact) 1.3f else 1.4f
+    val titleGap = if (compact) 3.dp else 4.dp
+    val metaSize = if (compact) 10.4.sp else 11.2.sp
+    val metaGap = if (compact) 5.dp else 7.dp
+    val actionTop = if (compact) 5.dp else 7.dp
+    val actionBtn = if (compact) 28.dp else 32.dp
 
     Column(
         modifier
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .clickable(onClick = onClick)
+            .background(Px.CardBg)
+            .border(1.dp, Px.Border, shape)
+            .pxTap(onClick = onClick)
     ) {
         // ── .content-thumb (aspect 2/3; wide → 16/9) ────────────────────────
         Box(
@@ -115,7 +122,6 @@ fun ContentCardCell(
                 .fillMaxWidth()
                 .aspectRatio(if (wide) 16f / 9f else 2f / 3f)
                 .background(Px.BgDarker)
-                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
         ) {
             if (!posterUrl.isNullOrBlank()) {
                 AsyncImage(
@@ -125,33 +131,27 @@ fun ContentCardCell(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                // .content-thumb-placeholder: gradiente 135deg #1a1a20→#0d0d12,
-                // MovieIcon 32 (26 se wide) + título 0.72rem centrado.
+                // .content-thumb-placeholder: gradiente 135deg #1a1a20→#0d0d12
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                listOf(Color(0xFF1A1A20), Color(0xFF0D0D12))
-                            )
-                        ),
+                        .background(Brush.linearGradient(listOf(Color(0xFF1A1A20), Color(0xFF0D0D12)))),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        Icons.Filled.Movie,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Icons.Filled.Movie, null,
+                        tint = Px.TextMuted,
                         modifier = Modifier.size(if (wide) 26.dp else 32.dp)
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         title,
-                        fontSize = 11.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.52.sp,
+                        color = Px.TextMuted,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 6.dp)
                     )
                 }
@@ -166,8 +166,7 @@ fun ContentCardCell(
                     .background(typeColor)
             )
 
-            // Badge de rating — inline style do original: top 8 / right 8,
-            // rgba(0,0,0,0.78), radius 4, padding 2×6, StarIcon 11 #ffd700
+            // Badge de rating — top 8 / right 8, rgba(0,0,0,0.78), radius 4, padding 2×6
             if (ratingStr != null) {
                 Row(
                     Modifier
@@ -178,22 +177,17 @@ fun ContentCardCell(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Icon(
-                        Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFD700),
-                        modifier = Modifier.size(11.dp)
-                    )
-                    Text(ratingStr, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Filled.Star, null, tint = Color(0xFFFFD700), modifier = Modifier.size(11.dp))
+                    Text(ratingStr, fontSize = 10.88.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            // Badge de tipo — bottom 12 se houver progress, senão 8; left 8
-            // right 8 maxWidth fit-content; rgba(0,0,0,0.72) radius 4
+            // Badge de tipo — t(`catalog.${type}`); bottom 12 se houver progress, senão 8
             if (type != null) {
+                val label = typeLabel ?: t.t("catalog.$type").takeIf { it != "catalog.$type" } ?: type
                 Text(
-                    text = typeLabel ?: CATALOG_TYPE_LABELS[type] ?: type,
-                    fontSize = 10.sp,
+                    text = label,
+                    fontSize = 9.92.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     maxLines = 1,
@@ -225,73 +219,61 @@ fun ContentCardCell(
             }
         }
 
-        // ── .content-info — padding 8px 10px 10px ───────────────────────────
-        Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp)) {
-            // .content-title — 0.8rem/600, clamp 2, line-height 1.4, mb 4
+        // ── .content-info ───────────────────────────────────────────────────
+        Column(Modifier.padding(start = infoStart.dp, end = infoEnd.dp, top = infoTop.dp, bottom = infoBottom.dp)) {
+            // .content-title — 600, clamp 2 linhas
             Text(
                 title,
-                fontSize = 13.sp,
+                fontSize = titleSize,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 18.sp,
+                color = Px.TextTitle,
+                lineHeight = (titleSize.value * titleLine).sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(bottom = 4.dp)
+                modifier = Modifier.padding(bottom = titleGap)
             )
 
-            // .content-meta — flex gap 7, 0.7rem muted; year + rating(#ffd700)
+            // .content-meta — ano + rating (#ffd700)
             if (year != null || ratingStr != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    horizontalArrangement = Arrangement.spacedBy(metaGap)
                 ) {
-                    if (year != null) {
-                        Text(year.toString(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    if (year != null) Text(year.toString(), fontSize = metaSize, color = Px.TextMuted)
                     if (ratingStr != null) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            modifier = Modifier.align(Alignment.CenterVertically)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Icon(
-                                Icons.Filled.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFD700),
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Text(ratingStr, fontSize = 11.sp, color = Color(0xFFFFD700))
+                            Icon(Icons.Filled.Star, null, tint = Color(0xFFFFD700), modifier = Modifier.size(11.dp))
+                            Text(ratingStr, fontSize = metaSize, color = Color(0xFFFFD700))
                         }
                     }
                 }
             }
 
-            // .content-actions — mt 7 pt 7 border-top; botões 32×32 radius 6
+            // .content-actions — margin-top/padding-top + border-top 1px
             if (onAddToList != null || onShare != null) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(top = 7.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(top = 7.dp),
+                        .padding(top = actionTop)
+                        .drawBehind {
+                            drawLine(Px.Border, Offset(0f, 0.5.dp.toPx()), Offset(size.width, 0.5.dp.toPx()), 1.dp.toPx())
+                        }
+                        .padding(top = actionTop),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (onAddToList != null) {
-                        CardActionButton(
-                            active = inList == true,
-                            onClick = onAddToList
-                        ) {
-                            if (inList == true) {
-                                Icon(Icons.Filled.Check, contentDescription = "Remover da lista", modifier = Modifier.size(16.dp))
-                            } else {
-                                Icon(Icons.Filled.Add, contentDescription = "Adicionar à lista", modifier = Modifier.size(16.dp))
-                            }
+                        CardActionButton(active = inList == true, size = actionBtn, onClick = onAddToList) {
+                            if (inList == true) Icon(Icons.Filled.Check, "Remover da lista", Modifier.size(16.dp))
+                            else Icon(Icons.Filled.Add, "Adicionar à lista", Modifier.size(16.dp))
                         }
                     }
                     if (onShare != null) {
-                        CardActionButton(active = false, onClick = onShare) {
-                            Icon(Icons.Filled.Share, contentDescription = "Compartilhar", modifier = Modifier.size(15.dp))
+                        CardActionButton(active = false, size = actionBtn, onClick = onShare) {
+                            Icon(Icons.Filled.Share, "Compartilhar", Modifier.size(15.dp))
                         }
                     }
                 }
@@ -300,25 +282,23 @@ fun ContentCardCell(
     }
 }
 
+/** `.card-action-btn` (+ `.active` → cor primária). A cor chega aos ícones via LocalContentColor. */
 @Composable
 private fun CardActionButton(
     active: Boolean,
+    size: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
     Box(
         Modifier
-            .size(32.dp)
+            .size(size)
             .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
+            .pxTap(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.runtime.CompositionLocalProvider(
-            LocalContentCardActionTint provides if (active) Px.Primary else MaterialTheme.colorScheme.onSurfaceVariant
-        ) {
+        CompositionLocalProvider(LocalContentColor provides if (active) Px.Primary else Px.TextMuted) {
             content()
         }
     }
 }
-
-private val LocalContentCardActionTint = compositionLocalOf { Color.Unspecified }
