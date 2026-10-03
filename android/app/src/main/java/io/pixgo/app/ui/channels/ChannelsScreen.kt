@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.InfoOutlined
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
@@ -225,7 +225,7 @@ fun ChannelsScreen(
                         }
                     }
                     Icon(
-                        Icons.Filled.InfoOutlined, t.t("channels.infoTitle"),
+                        Icons.Outlined.Info, t.t("channels.infoTitle"),
                         Modifier.size(16.dp).pxTap { showInfo = true }, tint = Px.TextMuted,
                     )
                 }

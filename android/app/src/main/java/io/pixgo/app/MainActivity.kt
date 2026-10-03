@@ -22,6 +22,7 @@ import io.pixgo.app.data.auth.AuthState
 import io.pixgo.app.data.i18n.LocalTranslator
 import io.pixgo.app.data.i18n.Translator
 import io.pixgo.app.data.i18n.contentLangFor
+import io.pixgo.app.ui.chat.PixelChatbot
 import io.pixgo.app.ui.common.applyImmersive
 import io.pixgo.app.ui.nav.MainDest
 import io.pixgo.app.ui.nav.PixGoScaffold
@@ -409,7 +410,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
         // main/layout.tsx renderiza <PixelChatbot /> ao lado do AppShell, em todas as páginas de /main.
         // Fica por baixo dos ecrãs a ecrã inteiro (Watch/Canal) — o web também o oculta nesses modais.
         if (watchContentId == null && watchOffline == null && watchingChannel == null && checkoutUrl == null && !showCopyright) {
-            io.pixgo.app.ui.chat.PixelChatbot(
+            PixelChatbot(
                 isGreeted = { app.authRepository.isPixelGreeted() },
                 markGreeted = { app.authRepository.markPixelGreeted() },
                 send = { msg, hist -> app.contactRepository.chat(msg, hist) },
@@ -476,7 +477,7 @@ fun HomeShell(authState: AuthState, app: PixGoApp) {
             }
         }
 
-        // Central de direitos autorais: ecrã inteiro por cima do app (rotas /copyright/* e /legal públicas).
+        // Central de direitos autorais: ecrã inteiro por cima do app (rotas de /copyright e /legal públicas).
         if (showCopyright) {
             io.pixgo.app.ui.copyright.CopyrightHost(
                 repository = app.copyrightRepository,

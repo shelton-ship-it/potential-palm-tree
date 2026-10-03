@@ -133,7 +133,7 @@ fun AccountScreen(
                     "security" -> SecurityTab(authRepository, scope, toast, onForcedLogout)
                     "subscription" -> SubscriptionTab(state.plan, state.profiles.size, onOpenPlans)
                     "profiles" -> ProfilesTab(authRepository, state.profiles, state.plan, scope, toast)
-                    else -> HelpTab(contactRepository, scope, toast)
+                    else -> HelpTab(contactRepository, scope, toast, onOpenCopyright)
                 }
             }
         }
@@ -416,8 +416,9 @@ private fun IconAction(icon: androidx.compose.ui.graphics.vector.ImageVector, de
     ) { Icon(icon, description, Modifier.size(16.dp), tint = Px.TextMuted) }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HelpTab(contactRepository: ContactRepository, scope: CoroutineScope, toast: (String) -> Unit) {
+private fun HelpTab(contactRepository: ContactRepository, scope: CoroutineScope, toast: (String) -> Unit, onOpenCopyright: () -> Unit) {
     val t = LocalTranslator.current
     val uriHandler = LocalUriHandler.current
     var reportTitle by remember { mutableStateOf("") }

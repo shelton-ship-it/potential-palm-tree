@@ -19,7 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * Fluxo de notificação de direitos autorais (app/copyright/*). Contrato lido
+ * Fluxo de notificação de direitos autorais (rotas app/copyright/…). Contrato lido
  * em lib/api.ts (copyrightApi.submit / lookup) e lib/copyright.ts.
  */
 class CopyrightRepository(context: Context) {
