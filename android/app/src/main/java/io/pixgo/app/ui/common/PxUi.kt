@@ -562,14 +562,14 @@ fun PxCardWithHeader(title: String, modifier: Modifier = Modifier, content: @Com
     }
 }
 
-/** Avatar circular com gradiente primário→roxo e inicial(is). */
+/** Avatar circular: fundo branco com a(s) inicial(is) a preto (pedido explícito). */
 @Composable
 fun PxAvatar(text: String, size: Dp, fontSize: androidx.compose.ui.unit.TextUnit, modifier: Modifier = Modifier, display: Boolean = true) {
     Box(
         modifier.size(size).clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Px.Primary, Px.Accent))),
+            .background(Color.White),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color.White, fontFamily = if (display) Montserrat else Poppins, fontWeight = FontWeight.Black, fontSize = fontSize)
+        Text(text, color = Color.Black, fontFamily = if (display) Montserrat else Poppins, fontWeight = FontWeight.Black, fontSize = fontSize)
     }
 }

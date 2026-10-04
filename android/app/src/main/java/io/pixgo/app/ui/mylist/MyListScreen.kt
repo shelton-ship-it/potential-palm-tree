@@ -70,6 +70,8 @@ fun MyListScreen(
         if (activeProfileId == null) { loading = false; return@LaunchedEffect }
         loading = true
         items = runCatching { catalogRepository.myList(activeProfileId) }.getOrDefault(emptyList())
+        catalogRepository.bindMyListProfile(activeProfileId)
+        catalogRepository.seedMyList(items.map { it.contentId })
         loading = false
     }
 
@@ -77,6 +79,7 @@ fun MyListScreen(
         if (activeProfileId == null) return
         val before = items
         items = items.filter { it.contentId != entry.contentId }
+        catalogRepository.seedMyList(listOf(entry.contentId), inList = false)
         scope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
             snackbarHostState.showSnackbar("\uD83D\uDDD1 " + t.t("myList.removed"))
@@ -85,6 +88,7 @@ fun MyListScreen(
             val ok = runCatching { catalogRepository.removeFromMyList(activeProfileId, entry.contentId) }.getOrDefault(false)
             if (!ok) {
                 items = before
+                catalogRepository.seedMyList(listOf(entry.contentId))
                 snackbarHostState.currentSnackbarData?.dismiss()
                 snackbarHostState.showSnackbar(t.t("errors.networkError"))
             }
@@ -111,7 +115,6 @@ fun MyListScreen(
                     PxEmptyState(
                         icon = Icons.Filled.Bookmark,
                         title = t.t("myList.empty"),
-                        description = t.t("myList.emptyDesc"),
                         action = {
                             PxButton(
                                 text = t.t("myList.browse"), onClick = onBrowseCatalog,

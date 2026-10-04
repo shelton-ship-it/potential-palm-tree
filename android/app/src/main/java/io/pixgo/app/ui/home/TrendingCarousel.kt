@@ -77,9 +77,10 @@ private const val RESUME_AFTER_TOUCH_MS = 6000L
  *  • pausa automática: toque/arrasto em curso (retoma 6s depois), foco dentro
  *    da secção, secção fora do ecrã (a lazy list descarta o item → o efeito
  *    cancela-se sozinho);
- *  • botão Pausar/Reproduzir sempre visível; com animações do sistema
- *    desligadas (equivalente a prefers-reduced-motion) o autoplay nasce parado;
- *  • setas (dão a volta) e pontos sempre visíveis.
+ *  • SEM botão Pausar/Reproduzir e SEM pontos (pedido explícito): tocar no
+ *    carrossel já o pausa; com animações do sistema desligadas
+ *    (prefers-reduced-motion) o autoplay nasce parado;
+ *  • setas (dão a volta) sempre visíveis.
  * Larguras: --tc-w = clamp(190px, 17vw, 240px); <=600px 46vw.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
@@ -89,6 +90,7 @@ fun TrendingCarousel(
     title: String,
     onOpenContent: (String) -> Unit,
     modifier: Modifier = Modifier,
+    myList: io.pixgo.app.ui.common.MyListUi? = null,
 ) {
     if (items.isEmpty()) return
 
@@ -101,12 +103,13 @@ fun TrendingCarousel(
     val slideW = if (compact) (screenW * 0.46f).dp else (screenW * 0.17f).coerceIn(190f, 240f).dp
     val gap = if (compact) 8.dp else 14.dp
     val arrowSize = if (compact) 30.dp else 36.dp
-    val dotTouch = if (compact) 18.dp else 22.dp
 
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val n = items.size
 
+    // Sem botão de pausa: tocar/arrastar o carrossel já o pausa (touchHold abaixo).
+    // Só o 'reduce motion' do sistema desliga o auto-avanço.
     var playing by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         // prefers-reduced-motion: reduce → autoplay nasce desligado.
@@ -125,15 +128,6 @@ fun TrendingCarousel(
     val maxScroll = max(0f, contentPx - viewportPx)
     val pageCount = if (viewportPx <= 0) 1 else max(1, ceil(contentPx / viewportPx - 0.05f).toInt())
 
-    val page by remember(pageCount, maxScroll, slideWPx, gapPx) {
-        derivedStateOf {
-            if (maxScroll > 1f && pageCount > 1) {
-                val cur = state.firstVisibleItemIndex * (slideWPx + gapPx) + state.firstVisibleItemScrollOffset
-                ((cur / maxScroll) * (pageCount - 1)).roundToInt().coerceIn(0, pageCount - 1)
-            } else 0
-        }
-    }
-
     fun currentScroll(): Float =
         state.firstVisibleItemIndex * (slideWPx + gapPx) + state.firstVisibleItemScrollOffset
 
@@ -148,11 +142,6 @@ fun TrendingCarousel(
             else -> dir * max(viewportPx * 0.9f, minStepPx)
         }
         state.animateScrollBy(amount)
-    }
-
-    fun goToPage(i: Int) {
-        val left = if (pageCount <= 1) 0f else (i.toFloat() / (pageCount - 1)) * maxScroll
-        scope.launch { state.animateScrollBy(left - currentScroll()) }
     }
 
     // ── Pausas que não alteram a intenção do utilizador (`playing`) ──────────
@@ -185,27 +174,6 @@ fun TrendingCarousel(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(title, style = PxText.SectionTitle)
-            // .tc-toggle
-            Row(
-                Modifier
-                    .height(32.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x0FFFFFFF))
-                    .border(1.dp, Px.Border, CircleShape)
-                    .pxTap { playing = !playing }
-                    .padding(start = 8.dp, end = if (compact) 8.dp else 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                val label = if (playing) t.t("home.trendingPause") else t.t("home.trendingPlay")
-                Icon(
-                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    label, Modifier.size(18.dp), tint = Px.TextLight,
-                )
-                if (!compact) {
-                    Text(label, color = Px.TextLight, fontSize = 11.52.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.23.sp)
-                }
-            }
         }
 
         // .tc-viewport
@@ -227,6 +195,8 @@ fun TrendingCarousel(
                             wide = true,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { onOpenContent(item.id) },
+                            inList = myList?.isIn(item.id),
+                            onAddToList = myList?.let { m -> { m.toggle(item.id) } },
                         )
                     }
                 }
@@ -244,24 +214,6 @@ fun TrendingCarousel(
                 size = arrowSize, dimmed = pageCount <= 1,
                 description = t.t("home.trendingNext"), left = false,
             ) { scope.launch { move(1) } }
-        }
-
-        // .tc-dots (flex-wrap, gap 2)
-        FlowRow(
-            Modifier.fillMaxWidth().padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
-        ) {
-            for (i in 0 until pageCount) {
-                val w by animateDpAsState(if (i == page) 22.dp else 8.dp, tween(250), label = "dotW")
-                Box(Modifier.size(dotTouch).pxTap { goToPage(i) }, contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier
-                            .width(w).height(8.dp)
-                            .clip(CircleShape)
-                            .background(if (i == page) Px.Primary else Color(0x47FFFFFF))
-                    )
-                }
-            }
         }
     }
 }

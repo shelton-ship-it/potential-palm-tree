@@ -3,7 +3,9 @@ package io.pixgo.app.data.network
 import android.content.Context
 import io.pixgo.app.data.auth.TokenManager
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import kotlinx.serialization.json.Json
+import okhttp3.Cache
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -74,7 +76,14 @@ object NetworkModule {
             okHttpClient?.let { return it }
             val jar = cookieJar ?: PersistentCookieJar(context.applicationContext).also { cookieJar = it }
             val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
+            // Cache HTTP em disco (20 MB): o navegador do frontend_web já honra
+            // o Cache-Control do pixel_service (catálogo: public, max-age=60;
+            // legal: max-age=3600). Sem isto cada visita a um separador
+            // repetia o pedido ao servidor. Rotas com no-store (me, content,
+            // progress, payments, channels...) continuam a não ser guardadas.
+            val httpCache = Cache(File(context.applicationContext.cacheDir, "http_cache"), 20L * 1024 * 1024)
             val client = OkHttpClient.Builder()
+                .cache(httpCache)
                 .cookieJar(jar)
                 .addInterceptor(authInterceptor(tokenManager))
                 .addInterceptor(logging)

@@ -72,6 +72,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 private const val LIMIT = 24
+private const val nTMin = 3   // mínimo de verticais por linha (useRowCounts)
 
 private val TYPES = listOf("all", "video", "movie", "series", "anime", "documentary", "dorama")
 private val KID_TYPES = listOf("anime", "dorama")
@@ -128,6 +129,7 @@ fun ExploreScreen(
     val gridSpec = rememberGridSpec()
     val contentLang = contentLangFor(uiLang)
     val visibleTypes = if (isKidProfile) KID_TYPES else TYPES
+    val myList = io.pixgo.app.ui.common.rememberMyList(catalogRepository, activeProfileId)
 
     var type by remember(isKidProfile) { mutableStateOf(if (isKidProfile) "anime" else "all") }
     var sort by remember { mutableStateOf("recent") }
@@ -168,12 +170,32 @@ fun ExploreScreen(
     // load(1) sempre que tipo/ordem/perfil/idioma mudam; load(n) para a paginação numerada.
     suspend fun load(p: Int) {
         loading = true
+        val typeAtStart = type
         val res = runCatching { fetch(p) }.getOrNull()
         if (res != null) {
-            items = res.items
-            pages = res.pages
-            page = p
-            hasMore = if (res.pages > 0) p < res.pages else res.items.size == LIMIT
+            var all = res.items
+            var pg = p
+            var pgs = res.pages
+            var more = if (res.pages > 0) p < res.pages else res.items.size == LIMIT
+            // "Séries": o padrão é 2 linhas de mini séries + 1 de verticais. Se a 1.ª página
+            // vier quase só com mini séries, as verticais chegariam depois (e entrariam
+            // numa linha ACIMA do que se vê, só aparecendo ao voltar ao topo). Por isso,
+            // enquanto estiver no skeleton, pede mais páginas (máx. 4) até haver verticais
+            // suficientes para as primeiras linhas.
+            if (typeAtStart == "series" && p == 1) {
+                var extra = 0
+                while (more && extra < 4 && all.count { !it.isChannelSeries } < nTMin * 2) {
+                    val nx = runCatching { fetch(pg + 1) }.getOrNull() ?: break
+                    val seen = all.map { it.id }.toHashSet()
+                    all = all + nx.items.filter { it.id !in seen }
+                    pg += 1; pgs = nx.pages; extra++
+                    more = if (nx.pages > 0) pg < nx.pages else nx.items.size == LIMIT
+                }
+            }
+            items = all
+            pages = pgs
+            page = pg
+            hasMore = more
         } else {
             items = emptyList()
         }
@@ -272,7 +294,7 @@ fun ExploreScreen(
                 } else if (trending.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "trending") {
                         TrendingCarousel(
-                            items = trending, title = t.t("home.trending"), onOpenContent = onOpenContent,
+                            items = trending, title = t.t("home.trending"), onOpenContent = onOpenContent, myList = myList,
                             modifier = Modifier.padding(bottom = (34.dp - gridSpec.gap).coerceAtLeast(0.dp))
                         )
                     }
@@ -300,7 +322,7 @@ fun ExploreScreen(
                             for (c in 0 until n) {
                                 Box(Modifier.weight(1f)) {
                                     row.items.getOrNull(c)?.let { item ->
-                                        CatalogCard(item, wide = row.kind == RowKind.M, onOpenContent, activeProfileId, catalogRepository, scope)
+                                        CatalogCard(item, wide = row.kind == RowKind.M, onOpenContent, myList)
                                     }
                                 }
                             }
@@ -310,7 +332,7 @@ fun ExploreScreen(
                 else -> {
                     val shown = if (type == "all") items.filter { !it.isChannelSeries } else items
                     items(shown, key = { it.id }) { item ->
-                        CatalogCard(item, wide = false, onOpenContent, activeProfileId, catalogRepository, scope)
+                        CatalogCard(item, wide = false, onOpenContent, myList)
                     }
                 }
             }
@@ -344,9 +366,7 @@ private fun CatalogCard(
     item: ContentItem,
     wide: Boolean,
     onOpenContent: (String) -> Unit,
-    activeProfileId: String?,
-    repo: CatalogRepository,
-    scope: kotlinx.coroutines.CoroutineScope,
+    myList: io.pixgo.app.ui.common.MyListUi,
 ) {
     ContentCardCell(
         title = item.displayTitle,
@@ -357,11 +377,9 @@ private fun CatalogCard(
         wide = wide,
         modifier = Modifier.fillMaxWidth(),
         onClick = { onOpenContent(item.id) },
-        // onAddToList: myListApi.add(profileId, id).catch(() => {}) — silencioso
-        onAddToList = {
-            val pid = activeProfileId
-            if (pid != null) scope.launch { runCatching { repo.addToMyList(pid, item.id) } }
-        },
+        // Botão "+" / "✓": igual em TODOS os cards (ver MyListUi).
+        inList = myList.isIn(item.id),
+        onAddToList = { myList.toggle(item.id) },
     )
 }
 

@@ -167,7 +167,9 @@ fun ContentCardCell(
             )
 
             // Badge de rating — top 8 / right 8, rgba(0,0,0,0.78), radius 4, padding 2×6
-            if (ratingStr != null) {
+            // Cards verticais: rating e ano SAEM (pedido explícito; o ano fica na página de
+            // Watch). Os cards `wide` (mini séries) mantêm-se exactamente como estavam.
+            if (wide && ratingStr != null) {
                 Row(
                     Modifier
                         .align(Alignment.TopEnd)
@@ -229,12 +231,18 @@ fun ContentCardCell(
                 color = Px.TextTitle,
                 lineHeight = (titleSize.value * titleLine).sp,
                 maxLines = 2,
+                // Altura FIXA nos cards verticais: o título reserva sempre 2 linhas,
+                // por isso um título curto não encolhe o card (antes, num mesmo
+                // separador — Documentários, Filmes... — havia cards de alturas
+                // diferentes). Os cards "wide" (mini séries 16:9) ficam EXACTAMENTE
+                // como estavam: 1 linha mínima, sem qualquer normalização.
+                minLines = if (wide) 1 else 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(bottom = titleGap)
             )
 
             // .content-meta — ano + rating (#ffd700)
-            if (year != null || ratingStr != null) {
+            if (wide && (year != null || ratingStr != null)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(metaGap)

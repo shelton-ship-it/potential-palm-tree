@@ -379,33 +379,10 @@ fun PixGoScaffold(
                 )
                 Spacer(Modifier.width(26.dp))
 
-                // pesquisa: flex:1; maxWidth:380
-                Box(Modifier.weight(1f)) {
-                    Box(
-                        Modifier
-                            .widthIn(max = 380.dp)
-                            .fillMaxWidth()
-                            .onGloballyPositioned { searchRect = it.boundsInRoot() }
-                    ) {
-                        HeaderSearch(
-                            query = query,
-                            onQueryChange = { query = it },
-                            placeholder = t.t("nav.search") + "...",
-                            // <=480px: .search-input { max-width:120px }
-                            maxInputWidth = if (widthDp <= 480.dp) 120.dp else Dp.Unspecified,
-                            onFocus = { if (results.isNotEmpty()) showDrop = true },
-                            onSubmit = {
-                                if (query.isNotBlank()) {
-                                    onSubmitSearch(query.trim()); showDrop = false; query = ""
-                                }
-                            },
-                        )
-                        // .input-spinner-slot { right:10px } — relativo ao contentor
-                        if (searching) {
-                            Box(Modifier.align(Alignment.CenterEnd).padding(end = 10.dp)) { Spinner(15.dp) }
-                        }
-                    }
-                }
+                // Barra de pesquisa do header REMOVIDA (pedido explícito). A pesquisa
+                // continua disponível pelo item "Pesquisar" do menu lateral. O espaço
+                // flexível empurra as acções (idioma, downloads, avatar) para a direita.
+                Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(10.dp))
 
                 // .header-actions gap:7
@@ -451,12 +428,12 @@ fun PixGoScaffold(
                             .size(36.dp)
                             .drawBehind { drawCircle(Color(0x4DE50914), radius = size.minDimension / 2 + 2.dp.toPx()) }
                             .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(Px.Primary, Px.Accent)))
+                            .background(Color.White)
                             .onGloballyPositioned { userRect = it.boundsInRoot() }
                             .tap { userMenuOpen = !userMenuOpen },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(initials, color = Color.White, fontFamily = Montserrat, fontWeight = FontWeight.Black, fontSize = 12.48.sp)
+                        Text(initials, color = Color.Black, fontFamily = Montserrat, fontWeight = FontWeight.Black, fontSize = 12.48.sp)
                     }
                 }
             }
@@ -507,10 +484,10 @@ fun PixGoScaffold(
                             MenuItem(onClick = { onSelectProfile(p.id); userMenuOpen = false }, gap = 8.dp) {
                                 Box(
                                     Modifier.size(22.dp).clip(CircleShape)
-                                        .background(Brush.linearGradient(listOf(Px.Primary, Px.Accent))),
+                                        .background(Color.White),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(p.name.take(1).ifEmpty { "?" }.uppercase(), color = Color.White, fontSize = 10.88.sp, fontWeight = FontWeight.ExtraBold)
+                                    Text(p.name.take(1).ifEmpty { "?" }.uppercase(), color = Color.Black, fontSize = 10.88.sp, fontWeight = FontWeight.ExtraBold)
                                 }
                                 Text(p.name, color = Px.TextMuted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 if (p.isKid == true) Icon(Icons.Filled.ChildCare, null, Modifier.size(14.dp), tint = Px.TextMuted)

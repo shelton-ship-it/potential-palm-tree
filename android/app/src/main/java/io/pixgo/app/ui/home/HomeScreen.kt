@@ -88,6 +88,7 @@ fun HomeScreen(
     var loadingMore by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val myList = io.pixgo.app.ui.common.rememberMyList(catalogRepository, activeProfileId)
 
     // Carga inicial — reinicia tudo quando o perfil activo / idioma muda.
     LaunchedEffect(activeProfileId, uiLang, reloadKey) {
@@ -171,7 +172,7 @@ fun HomeScreen(
         if (trending.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }, key = "trending") {
                 TrendingCarousel(
-                    items = trending, title = t.t("home.trending"), onOpenContent = onOpenContent,
+                    items = trending, title = t.t("home.trending"), onOpenContent = onOpenContent, myList = myList,
                     modifier = Modifier.padding(bottom = sectionGap)   // .section { margin-bottom:34px }
                 )
             }
@@ -195,7 +196,9 @@ fun HomeScreen(
                 year = item.year,
                 type = item.type,
                 rating = item.displayRating,
-                onClick = { onOpenContent(item.id) }
+                onClick = { onOpenContent(item.id) },
+                inList = myList.isIn(item.id),
+                onAddToList = { myList.toggle(item.id) },
             )
         }
 

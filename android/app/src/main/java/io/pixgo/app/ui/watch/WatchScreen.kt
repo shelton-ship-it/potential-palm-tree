@@ -185,9 +185,10 @@ fun WatchScreen(
         if (authState.user != null) {
             // in_list embutido quando profile_id foi junto; senão check separado.
             inList = d.inListRaw ?: catalogRepository.checkMyList(contentId, authState.activeProfileId)
+            catalogRepository.seedMyList(listOf(contentId), inList)
         }
         recommendations = try {
-            catalogRepository.recommended(d.type ?: "movie", contentId, contentLang)
+            catalogRepository.recommended(contentId, authState.activeProfileId, contentLang)
         } catch (e: Exception) { emptyList() }
     }
 
@@ -232,7 +233,7 @@ fun WatchScreen(
                     } else null
                 )
             }
-        } else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        } else Column(Modifier.fillMaxSize()) {
 
             // ── Voltar (btn-ghost btn-sm do topo da página) ────────────────
             Row(
@@ -319,7 +320,6 @@ fun WatchScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        d.type?.let { PxBadge(it.replaceFirstChar { c -> c.uppercase() }, PxBadgeKind.Red) }
                         d.year?.let { PxBadge(it.toString(), PxBadgeKind.Gray) }
                         d.displayRating?.takeIf { it > 0 }?.let { r ->
                             Row(
@@ -350,11 +350,12 @@ fun WatchScreen(
                                 if (pid == null) { toast = "Perfil não encontrado."; return@ActionChip }
                                 val was = inList
                                 inList = !was
+                                catalogRepository.seedMyList(listOf(contentId), !was)
                                 toast = if (!was) t.t("myList.added") else t.t("myList.removed")
                                 scope.launch {
                                     val ok = if (was) catalogRepository.removeFromMyList(pid, contentId)
                                     else catalogRepository.addToMyList(pid, contentId)
-                                    if (!ok) { inList = was; toast = t.t("errors.networkError") }
+                                    if (!ok) { inList = was; catalogRepository.seedMyList(listOf(contentId), was); toast = t.t("errors.networkError") }
                                 }
                             }
                         )
@@ -412,13 +413,35 @@ fun WatchScreen(
                     }
                     Spacer(Modifier.height(14.dp))
 
-                    // ── Descrição (card) — ep.description || meta.description || description ──
+                    // ── Descrição FIXA e minificada (estilo YouTube): 2 linhas; "Ver mais"
+                    // expande tudo (com rolagem própria para não empurrar a página).
                     val desc = d.displayDescription
                     if (!desc.isNullOrBlank()) {
-                        CardBox(padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) { Text(desc, color = Px.TextMuted, fontSize = 13.44.sp, lineHeight = 22.85.sp) }
-                        Spacer(Modifier.height(16.dp))
+                        var expanded by remember(contentId, activeEp?.id) { mutableStateOf(false) }
+                        CardBox(padding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) {
+                            Column(
+                                Modifier.fillMaxWidth().pxTap { expanded = !expanded }
+                                    .then(if (expanded) Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()) else Modifier)
+                            ) {
+                                Text(
+                                    desc, color = Px.TextMuted, fontSize = 13.sp, lineHeight = 19.sp,
+                                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    if (expanded) "Ver menos" else "Ver mais",
+                                    color = Px.TextLight, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
                     }
+                }   // fim da parte FIXA (título, botões, descrição)
 
+                // Só isto rola: temporadas/episódios + recomendados.
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Column(Modifier.padding(horizontal = 16.dp)) {
                     // ── Temporadas + Episódios ─────────────────────────────
                     if (isEpisodic && d.seasons.isNotEmpty()) {
                         // .card + .card-header (border-bottom) + chips de temporada + lista com altura máx. 320
@@ -483,6 +506,7 @@ fun WatchScreen(
                             recommendations.forEach { item -> RecommendCard(item) { onOpenRecommendation(item.id) } }
                         }
                     }
+                }
                 }
             }
         }

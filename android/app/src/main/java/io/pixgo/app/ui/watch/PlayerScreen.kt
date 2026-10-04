@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.AlertDialog
@@ -274,7 +275,16 @@ fun PlayerScreen(
                         player = exoPlayer
                         useController = true
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        // Controlos nativos sem anterior/seguinte; o ecrã inteiro é o
+                        // botão nativo da própria barra (não um botão solto sobre o vídeo).
+                        setShowNextButton(false)
+                        setShowPreviousButton(false)
                     }
+                },
+                update = { pv ->
+                    val toggle = onToggleFullscreen
+                    if (toggle != null) pv.setFullscreenButtonClickListener { toggle() }
+                    else pv.setFullscreenButtonClickListener(null)
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -290,20 +300,16 @@ fun PlayerScreen(
             }
         }
 
-        IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-            Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = Color.White)
-        }
-
-        // Botão de fullscreen (equivalente ao controle nativo hls.js/HTML5
-        // usado na web). Só aparece quando a Watch fornece o handler — as
-        // chamadas antigas (Home/Canais/deep-link) permanecem idênticas.
-        onToggleFullscreen?.let { toggle ->
-            IconButton(onClick = toggle, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                Icon(
-                    if (fullscreen) Icons.Filled.Close else Icons.Filled.SkipNext,
-                    contentDescription = if (fullscreen) "Sair da tela cheia" else "Tela cheia",
-                    tint = Color.White
-                )
+        // Player LIMPO (pedido explícito): sem "X" e sem o botão tipo "next" por cima do
+        // vídeo. Só resta o botão Voltar — e apenas em ecrã inteiro, onde a barra de
+        // voltar da página Watch não está visível. Sair do ecrã inteiro = voltar.
+        if (fullscreen) {
+            androidx.activity.compose.BackHandler { onToggleFullscreen?.invoke() ?: onClose() }
+            IconButton(
+                onClick = { onToggleFullscreen?.invoke() ?: onClose() },
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+            ) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.White)
             }
         }
 

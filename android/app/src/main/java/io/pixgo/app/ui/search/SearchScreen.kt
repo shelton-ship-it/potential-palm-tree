@@ -64,7 +64,8 @@ fun SearchScreen(
     catalogRepository: CatalogRepository,
     uiLang: String,
     onOpenContent: (String) -> Unit,
-    initialQuery: String = ""
+    initialQuery: String = "",
+    activeProfileId: String? = null,
 ) {
     val t = LocalTranslator.current
     val spec = rememberGridSpec()
@@ -73,6 +74,7 @@ fun SearchScreen(
     var total by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
+    val myList = io.pixgo.app.ui.common.rememberMyList(catalogRepository, activeProfileId)
 
     // setTimeout(() => inputRef.current?.focus(), 100)
     LaunchedEffect(Unit) { delay(100); runCatching { focus.requestFocus() } }
@@ -155,7 +157,9 @@ fun SearchScreen(
                     year = item.year,
                     type = item.type,
                     rating = item.displayRating,
-                    onClick = { onOpenContent(item.id) }
+                    onClick = { onOpenContent(item.id) },
+                    inList = myList.isIn(item.id),
+                    onAddToList = { myList.toggle(item.id) },
                 )
             }
         }

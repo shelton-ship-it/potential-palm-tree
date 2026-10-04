@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -135,7 +136,7 @@ fun PlansScreen(
             PxPageHeader(title = t.t("plans.title"), subtitle = t.t("plans.subtitle"))
             if (isMZN) {
                 Row(
-                    Modifier.padding(top = 0.dp, bottom = 22.dp),
+                    Modifier.padding(top = 0.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -150,7 +151,7 @@ fun PlansScreen(
             }
         }
 
-        if (loading) PxPageLoading()
+        if (loading) PxPageLoading(Modifier.height(120.dp))
 
         if (!loading && error) {
             // Texto literal idêntico ao fallback da página web.
@@ -162,21 +163,37 @@ fun PlansScreen(
         }
 
         if (!loading && !error) {
-            FlowRow(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                plans.forEach { p ->
-                    val isCurrent = plan?.id == p.id && isPremium
-                    val isFeatured = if (highlight != null) p.id == highlight else p.billingCycle == "annual"
-                    PlansCard(
-                        plan = p,
-                        isCurrent = isCurrent,
-                        isFeatured = isFeatured,
-                        onSubscribe = { handleSubscribe(p.id) },
-                        modifier = Modifier.widthIn(min = 260.dp, max = 340.dp).fillMaxWidth(),
-                    )
+            // Layout determinístico (antes: FlowRow com fillMaxWidth + widthIn, que em
+            // ecrãs estreitos inflava o espaço antes dos planos). Estreito: uma coluna
+            // de cards, logo abaixo do cabeçalho. Largo: cards lado a lado (.flex 1 1 280).
+            val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 768
+            if (narrow) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    plans.forEach { p ->
+                        PlansCard(
+                            plan = p,
+                            isCurrent = plan?.id == p.id && isPremium,
+                            isFeatured = if (highlight != null) p.id == highlight else p.billingCycle == "annual",
+                            onSubscribe = { handleSubscribe(p.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            } else {
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    plans.forEach { p ->
+                        PlansCard(
+                            plan = p,
+                            isCurrent = plan?.id == p.id && isPremium,
+                            isFeatured = if (highlight != null) p.id == highlight else p.billingCycle == "annual",
+                            onSubscribe = { handleSubscribe(p.id) },
+                            modifier = Modifier.width(320.dp),
+                        )
+                    }
                 }
             }
 
