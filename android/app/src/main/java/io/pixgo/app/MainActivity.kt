@@ -32,7 +32,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
-import io.pixgo.app.ui.auth.HubLoginSheet
+import io.pixgo.app.ui.auth.AuthScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -103,53 +103,17 @@ fun PixGoNavHost(nav: NavHostController, authState: AuthState, app: PixGoApp) {
 }
 
 /**
- * Tela de entrada — réplica do fluxo REAL ativo do frontend_web.
- *  - app/auth/login/page.tsx e register/page.tsx NÃO têm formulário nem UI
- *    própria ("pixgo.qzz.io não tem mais UI própria de autenticação"): fazem
- *    window.location.replace para o hub (HUB_LOGIN_URL?return_to=). O
- *    equivalente exacto no Android é abrir a HubLoginSheet (WebView dedicada
- *    só à autenticação, como a exceção já existente do checkout) logo ao
- *    entrar — sem botões "Entrar/Criar conta" inventados.
- *  - A página que pedia o CÓDIGO DE 6 DÍGITOS (login por código de TV /
- *    app.pixgo "auth/tv") foi REMOVIDA do fluxo (pedido explícito): em
- *    qualquer dispositivo, a entrada vai directa ao hub. A detecção de "TV"
- *    por teclado/D-pad também desaparece — era ela que mostrava essa página
- *    a quem não devia.
+ * Tela de entrada — login e registo NATIVOS (ui/auth/AuthScreens.kt), réplica de
+ * LoginPage.tsx / RegisterPage.tsx do hub com o mesmo CSS. Chamam diretamente
+ * POST /api/auth/login | register | google; ao autenticar, AuthRepository
+ * preenche o token e o PixGoNavHost navega sozinho para a Home.
+ * Sem WebView e sem campo de código de TV.
  */
 @Composable
 fun LoginScreen() {
     val context = LocalContext.current
     val app = context.applicationContext as PixGoApp
-    var hubMode by rememberSaveable { mutableStateOf<String?>("login") }   // "login" | "register"
-
-    if (hubMode != null) {
-        HubLoginSheet(
-            mode = hubMode!!,
-            authRepository = app.authRepository,
-            onClose = { hubMode = null }
-        )
-        return
-    }
-
-    // Se o hub for fechado sem concluir o login, mostra só o logo e permite
-    // voltar a abri-lo — nunca um campo de código.
-    Column(
-        modifier = Modifier.fillMaxSize().background(Px.BgDark).windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_pixgo_logo),
-            contentDescription = "PixGo",
-            modifier = Modifier.height(56.dp)
-        )
-        Spacer(Modifier.height(32.dp))
-        Button(
-            onClick = { hubMode = "login" },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Px.Primary)
-        ) { Text(LocalTranslator.current.t("auth.signIn")) }
-    }
+    AuthScreen(authRepository = app.authRepository)
 }
 
 @OptIn(androidx.media3.common.util.UnstableApi::class)

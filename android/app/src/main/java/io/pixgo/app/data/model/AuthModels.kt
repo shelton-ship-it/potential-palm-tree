@@ -84,5 +84,7 @@ data class MeCache(
 
 @Serializable
 data class ApiErrorBody(
-    val message: String? = null
+    val message: String? = null,
+    /** Código curto do backend (ex.: "AccountExistsUnlinked" em POST /api/auth/google). */
+    val error: String? = null
 )

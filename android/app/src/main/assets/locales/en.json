@@ -1064,5 +1064,24 @@
       "rejected": "Rejected",
       "removed": "Removed"
     }
+  },
+  "hubAuth": {
+    "welcomeBack": "Sign in to continue",
+    "createAccount": "Create account",
+    "optional": "(Optional)",
+    "username": "Username",
+    "password": "Password",
+    "name": "Name",
+    "email": "Email",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "invalidCredentials": "Incorrect username or password.",
+    "loginFailed": "Could not sign in. Please try again.",
+    "registerFailed": "Could not create account. Please try again.",
+    "orContinueWith": "or continue with",
+    "googleLoginFailed": "Could not sign in with Google. Please try again.",
+    "continueWithGoogle": "Continue with Google"
   }
 }

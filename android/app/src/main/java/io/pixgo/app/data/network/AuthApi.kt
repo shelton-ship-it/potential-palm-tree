@@ -15,6 +15,13 @@ import retrofit2.http.Path
 import kotlinx.serialization.Serializable
 
 @Serializable data class LoginBody(val username: String, val password: String)
+/** POST /api/auth/register (hub) — mesmo payload de useAuthStore.register(): email omitido quando vazio. */
+@Serializable data class RegisterBody(
+    val name: String,
+    val username: String,
+    val email: String? = null,
+    val password: String
+)
 /** POST /api/auth/google (hub) — body { credential } = ID token do Google Identity Services. */
 @Serializable data class GoogleCredentialBody(val credential: String)
 @Serializable data class RefreshBody(@kotlinx.serialization.SerialName("refresh_token") val refreshToken: String? = null)
@@ -38,7 +45,7 @@ interface ApiCoreAuthApi {
     suspend fun login(@Body body: LoginBody): Response<AuthResponse>
 
     @POST("/api/auth/register")
-    suspend fun register(@Body body: Map<String, String>): Response<AuthResponse>
+    suspend fun register(@Body body: RegisterBody): Response<AuthResponse>
 
     @POST("/api/auth/google")
     suspend fun loginWithGoogle(@Body body: GoogleCredentialBody): Response<AuthResponse>
