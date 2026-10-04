@@ -17,15 +17,6 @@ android {
         // não inventados aqui.
         versionCode = 1
         versionName = "0.1.0-dev"
-
-        // Client ID "Web application" do Google (o MESMO GOOGLE_CLIENT_ID do backend, que
-        // valida o `audience` do ID token). Vem de -PGOOGLE_WEB_CLIENT_ID ou da variável de
-        // ambiente do CI. Vazio => o botão "Continuar com Google" não aparece (como no web).
-        val googleWebClientId: String =
-            (project.findProperty("GOOGLE_WEB_CLIENT_ID") as String?)
-                ?: System.getenv("GOOGLE_WEB_CLIENT_ID")
-                ?: ""
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     buildTypes {
@@ -43,7 +34,6 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
@@ -79,11 +69,6 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-
-    // Login com Google nativo (Credential Manager) — ver ui/auth/GoogleSignIn.kt
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     implementation("io.coil-kt:coil-compose:2.6.0")
     // logo.svg (public/logo.svg do frontend_web) é desenhado tal e qual, sem conversão

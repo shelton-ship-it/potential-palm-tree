@@ -1064,24 +1064,5 @@
       "rejected": "Rechazado",
       "removed": "Retirado"
     }
-  },
-  "hubAuth": {
-    "welcomeBack": "Inicia sesión para continuar",
-    "createAccount": "Crear cuenta",
-    "optional": "(Opcional)",
-    "username": "Usuario",
-    "password": "Contraseña",
-    "name": "Nombre",
-    "email": "Correo",
-    "signIn": "Iniciar sesión",
-    "signUp": "Crear cuenta",
-    "noAccount": "¿Aún no tienes cuenta?",
-    "hasAccount": "¿Ya tienes cuenta?",
-    "invalidCredentials": "Usuario o contraseña incorrectos.",
-    "loginFailed": "No se pudo iniciar sesión. Inténtalo de nuevo.",
-    "registerFailed": "No se pudo crear la cuenta. Inténtalo de nuevo.",
-    "orContinueWith": "o continuar con",
-    "googleLoginFailed": "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
-    "continueWithGoogle": "Continuar con Google"
   }
 }
